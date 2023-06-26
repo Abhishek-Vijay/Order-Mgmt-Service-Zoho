@@ -1,7 +1,7 @@
 pipeline {
     agent { label 'build'}
     tools {
-        nodejs 'node-16'
+        nodejs 'node16'
     }
     stages {
         
