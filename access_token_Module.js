@@ -6,7 +6,7 @@ logger.level = "all"
 
 let token;
 token_timer = 0;
-const get_access_token = async() =>{
+const get_access_token = async(uhid, correlationId) =>{
     // let refresh_token = await file.refresh_token_read().then(data => data).catch(error => {
     //     logger.error(error);
     //     return;
@@ -17,12 +17,12 @@ const get_access_token = async() =>{
         .then(resp=>{
             if (resp.data.access_token) return resp.data;
             else{
-                logger.error(resp.data.error)
+                logger.error(resp.data.error," correlationId Id: ",correlationId, " patient uhid: ",uhid)
                 throw new Error(resp.data.error)
             }
         })
         .catch(error=>{
-            logger.error("step 2 error " + error.message)
+            logger.error("step 2 error " + error.message," correlationId Id: ",correlationId, " patient uhid: ",uhid)
             throw new Error("access token error, " + error.message);
         })
         // logger.info("Token got using refresh token ",token);
@@ -30,17 +30,17 @@ const get_access_token = async() =>{
         token_timer = Date.now();
         return token;
     }else{
-        logger.warn("refresh token is not found in File System");
+        logger.warn("refresh token is not found in File System"," correlationId Id: ",correlationId, " patient uhid: ",uhid);
         token = await axios.post(`https://accounts.zoho.in/oauth/v2/token?code=${process.env.code}&client_id=${process.env.clientId}&client_secret=${process.env.clientsecret}&redirect_uri=https://www.zoho.in/books&grant_type=authorization_code`)
         .then(res =>{
             if (res.data.access_token) return res.data;
             else{
-                logger.error(res.data.error)
+                logger.error(res.data.error," correlationId Id: ",correlationId, " patient uhid: ",uhid)
                 throw new Error(res.data.error);
             }
         })
         .catch(error=>{
-            logger.error("step 2 error " + error.message)
+            logger.error("step 2 error " + error.message," correlationId Id: ",correlationId, " patient uhid: ",uhid)
             throw new Error("access token error, " + error.message);
         })
         // logger.info("Token got using auth code ",token);

@@ -30,7 +30,7 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
 // SQS Caller Function to get the queue 
-const sqsFun = async() =>{
+const ReadingSQSMsg = async() =>{
     logger.info("Middleware called")
     try {
         let command = new ReceiveMessageCommand(params)
@@ -44,31 +44,33 @@ const sqsFun = async() =>{
         logger.error("Receive Error", err);
     }
 
-    setTimeout(()=>sqsFun(),5000);
+    setTimeout(()=>ReadingSQSMsg(),5000);
 }
 
 const processMessage = async(message) => {
     // Process the message here
     logger.info('Received message:', message.Body);
     let msg = JSON.parse(message.Body);
+    logger.info("Processing for the customer with"," correlation Id: ",msg.key.correlationId, " patient uhid: ",msg.key.clinicalUhid," encounter Id: ",msg.key.encounterId)
     // inserting user meta-data in PATIENT Table
-    let patient_insert_id = await db.Patient_Insert(msg.key.patientId, msg.key.clinicalUuid).then(data=>data).catch(err=>{
+    let patient_insertion_id = await db.Patient_Insert(msg.key.clinicalUhid, msg.key.patientId, msg.key.correlationId).then(data=>data).catch(err=>{
         logger.error(err);
         return;
     }); 
 
-    logger.info("patient insertion successfull ", patient_insert_id);
+    logger.info("patient insertion successfull ", patient_insertion_id," correlation Id: ",msg.key.correlationId);
     // inserting order and invoice-data in UC_ORDER Table
-    let noInsertion_status;
-    let order_insert_count = await db.Order_Insert(msg.key.orderId, patient_insert_id, {orderItems:msg.message.orderItems}).then(data=>data).catch(err=>{
+    // let noInsertion_status;
+    let order_insertion = await db.Order_Insert(msg.key.messageId, msg.key.encounterId, patient_insertion_id, {orderItems:msg.message.orderItems}, msg.key.correlationId).then(data=>data).catch(err=>{
         logger.error(err);
-        noInsertion_status = err.split(":")[1];
+        // noInsertion_status = err.split(":")[1];
         return;
     });
 
-    if(order_insert_count){
-        logger.info("order is inserted ", order_insert_count);
-        if(msg.key && msg.message && msg.key.hasOwnProperty('orderId') && msg.key.hasOwnProperty('patientId') && msg.key.hasOwnProperty('clinicalUuid') && msg.message.hasOwnProperty('orderItems')){
+    // console.log(noInsertion_status);
+    if(typeof order_insertion == 'number'){
+        logger.info(order_insertion," order is inserted in the UC_ORDER table"," with correlation Id: ",msg.key.correlationId," patient uhid: ",msg.key.clinicalUhid);
+        if(msg.key && msg.message && msg.key.hasOwnProperty('messageId') && msg.key.hasOwnProperty('encounterId') && msg.key.hasOwnProperty('patientId') && msg.key.hasOwnProperty('clinicalUhid') && msg.message.hasOwnProperty('orderItems') && msg.message.hasOwnProperty('personInfo')){
             // zoho invoice function caller
             let person_from_msg = msg.message.personInfo
             let user = {
@@ -84,27 +86,28 @@ const processMessage = async(message) => {
                     ],
                 "custom_fields": [
                         {
-                            "label": "UUID",
-                            "api_name": "cf_uuid",
-                            "value_formatted": `${msg.key.clinicalUuid}`,
+                            "label": "UHID",
+                            "api_name": "cf_uhid",
+                            "value_formatted": `${msg.key.clinicalUhid}`,
                             "search_entity": "contact",
                             "data_type": "string",
-                            "placeholder": "cf_uuid",
-                            "value": `${msg.key.clinicalUuid}`
+                            "placeholder": "cf_uhid",
+                            "value": `${msg.key.clinicalUhid}`
                         }
                     ]
             }
 
-            let invoice_response = await zoho.invoice(msg.key.clinicalUuid, msg.message.orderItems, user, msg.key.orderId).then(async(response)=>{
+            let invoice_response = await zoho.invoice(msg.key.clinicalUhid, msg.message.orderItems, user, msg.key.messageId, msg.key.correlationId).then(async(response)=>{
                 logger.info("success response",response);
-                await db.Order_Update_Invoice(response.order_id, response.invoice_no, "INVOICE_CREATED").then(data=>data).catch(err=>{
+                await db.Order_Update_Invoice(response.msg_id, response.invoice_no, "INVOICE_CREATED", response.correlationId).then(data=>data).catch(err=>{
                     logger.error(err);
                     return;
                 });
                 return response;
             }).catch(async(error)=>{
                 logger.error(error)
-                await db.Order_Update_Invoice(error.message.split("=>")[1], null, "INVOICE_FAILED").then(data=>data).catch(err=>{
+                console.log("came here");
+                await db.Order_Update_Invoice(error.message.split("<>")[1], null, "INVOICE_FAILED", error.message.split("->")[1]).then(data=>data).catch(err=>{
                     logger.error("INVOICE_FAILED ",err);
                     return;
                 });
@@ -118,16 +121,17 @@ const processMessage = async(message) => {
                 };
                 try {
                     const data = await sqsClient.send(new DeleteMessageCommand(deleteParams));
-                    logger.warn("Message deleted", data);
+                    logger.warn("Message deleted", data," with correlation Id: ",msg.key.correlationId," patient uhid: ",msg.key.clinicalUhid);
                 } catch (err) {
                     logger.error("Error while deleting ", err);
                 };
             }
         }else{
-            logger.warn("Bad message request from SQS");
+            logger.warn("Bad message request from SQS"," with correlation Id: ",msg.key.correlationId," patient uhid: ",msg.key.clinicalUhid);
         }
     }else{
-        if(noInsertion_status.split("_")[1].toUpperCase() != 'FAILED'){
+        // if(order_insertion.split("_")[1].toUpperCase() != 'FAILED')
+        if(order_insertion.split("_")[1].toUpperCase()){
             logger.warn("Deleting the messages since the record is already present in UC_ORDER Table");
             // Delete the message from the queue
             const deleteParams = {
@@ -179,5 +183,5 @@ app.post('/paymentHook', async(req, res) => {
 // app.listen() part should always be located in the last line of your code
 app.listen(5000, () => {
     console.log('Zoho Books APP/Webhook is listening');
-    sqsFun();
+    ReadingSQSMsg();
 })

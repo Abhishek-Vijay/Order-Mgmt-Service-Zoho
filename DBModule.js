@@ -30,6 +30,7 @@ DBModule.Patient_getAll = () =>{
         // postgres DB changes 
         pool.query('select * from PATIENT', (error, results) => {
             if (error) {
+                logger.error(error," correlationId Id: ",correlationId);
                 reject(error);
             }
             // response.status(200).json(results.rows)
@@ -44,6 +45,7 @@ DBModule.Order_getAll = () =>{
         // postgres DB changes 
         pool.query('select * from UC_ORDER', (error, results) => {
             if (error) {
+                logger.error(error," correlationId Id: ",correlationId);
                 reject(error);
             }
             // response.status(200).json(results.rows)
@@ -53,25 +55,27 @@ DBModule.Order_getAll = () =>{
 }
 
 // Patient Meta-Data Insertion Query
-DBModule.Patient_Insert = (clinical_patient_id, clinical_UUid) =>{
+DBModule.Patient_Insert = (clinical_uhid, uuid, correlationId) =>{
     return new Promise((resolve, reject) =>{
-        pool.query('select * from PATIENT where clinical_patient_id = $1 and clinical_UUid = $2', [clinical_patient_id, clinical_UUid] ,(error,res) => {
+        pool.query('select * from PATIENT where clinical_uhid = $1', [clinical_uhid] ,(error,res) => {
             if (error) {
+                logger.error(error," correlationId Id: ",correlationId);
                 reject(error);
             }else{
                 if(res.rows.length == 0){
                     let current_date = new Date().toLocaleString();
-                    let id = UUID();
-                    pool.query('INSERT INTO PATIENT (ID, clinical_patient_id, clinical_UUid, created_at, updated_at) VALUES ($1, $2, $3, $4, $4) RETURNING *', [id, clinical_patient_id, clinical_UUid, current_date], (error, results) => {
+                    // let id = UUID();
+                    pool.query('INSERT INTO PATIENT (clinical_uhid, uuid, created_at, updated_at) VALUES ($1, $2, $3, $3) RETURNING *', [clinical_uhid, uuid, current_date], (error, results) => {
                         if (error) {
+                            logger.error(error," correlationId Id: ",correlationId);
                             reject(error);
                         }
-                        logger.info("Inserting the row in PATIENT Table ",results.rows[0].id);
-                        resolve(results.rows[0].id);
+                        logger.info("Inserting the row in PATIENT Table ",results.rows[0].clinical_uhid," correlationId Id: ",correlationId);
+                        resolve(results.rows[0].clinical_uhid);
                     })
                 }else{
-                    logger.info("The record is already present in PATIENT Table ",res.rows[0].id);
-                    resolve(res.rows[0].id);
+                    logger.info("The record is already present in PATIENT Table ",res.rows[0].clinical_uhid," correlationId Id: ",correlationId);
+                    resolve(res.rows[0].clinical_uhid);
                 }
             }
         })
@@ -79,38 +83,41 @@ DBModule.Patient_Insert = (clinical_patient_id, clinical_UUid) =>{
 }
 
 // Patient Meta-Data Updation Query
-DBModule.Patient_Update = (id) =>{
+DBModule.Patient_Update = (clinical_uhid, correlationId) =>{
     let current_date = new Date().toLocaleString();
     return new Promise((resolve, reject) =>{
-        pool.query('UPDATE PATIENT SET UPDATED_AT = $2 WHERE id = $1', [id, current_date], (error, results) => {
+        pool.query('UPDATE PATIENT SET UPDATED_AT = $2 WHERE id = $1', [clinical_uhid, current_date], (error, results) => {
             if (error) {
+                logger.error(error," correlationId Id: ",correlationId);
                 reject(error);
             }
-            logger.info("Updating the row in PATIENT Table ",results.rows);
+            logger.info("Updating the row in PATIENT Table ",results.rows," correlationId Id: ",correlationId);
         })
     })
 }
 
 // UC_ORDER Insertion Query
-DBModule.Order_Insert = (order_id, patient_id , order_details) =>{
+DBModule.Order_Insert = (id, encounter_id, clinical_uhid, order_details, correlationId) =>{
     return new Promise((resolve, reject) =>{
-        pool.query('select * from UC_ORDER where order_id = $1', [order_id] ,(error,res) => {
+        pool.query('select * from UC_ORDER where id = $1', [id] ,(error,res) => {
             if (error) {
+                logger.error(error," correlationId Id: ",correlationId);
                 reject(error);
             }else{
                 if(res.rows.length == 0){
                     let current_date = new Date().toLocaleString();
                     let processing_status = 'IN_PROGRESS';
-                    pool.query('INSERT INTO UC_ORDER (order_id, patient_id, order_details, invoice_number , processing_status, created_at, updated_at) VALUES ($1, $2, $3, null, $4, $5, $5) RETURNING *', [order_id, patient_id, order_details, processing_status, current_date], (error, results) => {
+                    pool.query('INSERT INTO UC_ORDER (id, encounter_id, clinical_uhid, order_details, invoice_number , processing_status, created_at, updated_at) VALUES ($1, $2, $3, $4, null, $5, $6, $6) RETURNING *', [id, encounter_id, clinical_uhid, order_details, processing_status, current_date], (error, results) => {
                         if (error) {
+                            logger.error(error," correlationId Id: ",correlationId);
                             reject(error);
                         }
-                        logger.info("Inserting the row in UC_ORDER Table ",results.rowCount);
+                        logger.info("Inserting the row in UC_ORDER Table ",results.rowCount," correlationId Id: ",correlationId);
                         resolve(results.rowCount);
                     })
                 }else{
-                    logger.warn("The record is already present in UC_ORDER Table "+res.rows[0].processing_status);
-                    reject("The record is already present in UC_ORDER Table:"+res.rows[0].processing_status);
+                    logger.warn("The record is already present in UC_ORDER Table "+res.rows[0].processing_status," correlationId Id: ",correlationId);
+                    resolve(res.rows[0].processing_status);
                 }
             }
         })
@@ -119,14 +126,16 @@ DBModule.Order_Insert = (order_id, patient_id , order_details) =>{
 } 
 
 // UC_ORDER Invoice Updation Query
-DBModule.Order_Update_Invoice = (order_id, invoice_number, processing_status) =>{
+DBModule.Order_Update_Invoice = (id, invoice_number, processing_status, correlationId) =>{
     let current_date = new Date().toLocaleString();
     return new Promise((resolve, reject) =>{
-        pool.query('UPDATE UC_ORDER SET invoice_number = $2, processing_status = $3, UPDATED_AT = $4 WHERE order_id = $1',[order_id, invoice_number, processing_status, current_date], (error, results) => {
+        // console.log(id, invoice_number, processing_status);
+        pool.query('UPDATE UC_ORDER SET invoice_number = $2, processing_status = $3, UPDATED_AT = $4 WHERE id = $1',[id, invoice_number, processing_status, current_date], (error, results) => {
             if (error) {
+                logger.error(error," correlationId Id: ",correlationId);
                 reject(error);
             }
-            logger.info("Updating the row in UC_ORDER Table - Invoice ",results.rowCount);
+            logger.info("Updating the row in UC_ORDER Table - Invoice ",results.rowCount," correlationId Id: ",correlationId);
             resolve(results.rowCount);
         }) 
     })   
@@ -136,11 +145,12 @@ DBModule.Order_Update_Invoice = (order_id, invoice_number, processing_status) =>
 DBModule.Order_Update_Payment = (invoice_number, processing_status) =>{
     let current_date = new Date().toLocaleString();
     return new Promise((resolve, reject) =>{
-        pool.query('UPDATE UC_ORDER SET processing_status = $2, UPDATED_AT = $3 WHERE invoice_number = $1',[invoice_number, processing_status, current_date], (error, results) => {
+        pool.query('UPDATE UC_ORDER SET processing_status = $2, UPDATED_AT = $3 WHERE invoice_number = $1 RETURNING *',[invoice_number, processing_status, current_date], (error, results) => {
             if (error) {
+                logger.error(error);
                 reject(error);
             }
-            logger.info("Updating the row in UC_ORDER Table - Payment ",results.rowCount);
+            logger.info("Updating the Payment status in UC_ORDER Table - clinical uhid: ",results.rows[0].clinical_uhid, "encounter id: ",results.rows[0].encounter_id);
             resolve(results.rowCount);
         }) 
     })   
