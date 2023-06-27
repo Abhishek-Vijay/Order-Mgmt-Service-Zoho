@@ -1,13 +1,13 @@
-TOKEN=13516813516.fwufywv.scbweiochnw
+TOKEN = 13516813516.fwufywv.scbweiochnw
 
 organization_id = 60020823522
 clientId = 1000.F5SXT96LTYLGTH1KIEAP3RRQW3NF9Y
 clientsecret = c59989b20b948e43cc2dd9f96c3277e5619f281fe7
 code = 1000.33296dbbb2dc4f2c6b5c524d0a9e79bb.ad2e2b4a80c48a768e5e110fc6233b64
 
-PAYMENT_GATEWAY=razorpay
-REGION=ap-south-1
-queueURL=https://sqs.ap-south-1.amazonaws.com/315872761357/uc-invoice-generation
+PAYMENT_GATEWAY = razorpay
+REGION = ap-south-1
+queueURL = https://sqs.ap-south-1.amazonaws.com/315872761357/uc-invoice-generation
 
 POSTGRES_user = postgres
 POSTGRES_host = localhost
