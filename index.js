@@ -1,6 +1,6 @@
 'use strict';
 
-require('dotenv').config();
+// require('dotenv').config();
 const envVariables = require('./helper/envHelper');
 const express = require('express');
 const bodyParser = require('body-parser');
