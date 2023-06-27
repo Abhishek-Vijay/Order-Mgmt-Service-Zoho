@@ -1,18 +1,18 @@
 TOKEN = 13516813516.fwufywv.scbweiochnw
 
-organization_id = 60020823522
-clientId = 1000.F5SXT96LTYLGTH1KIEAP3RRQW3NF9Y
-clientsecret = c59989b20b948e43cc2dd9f96c3277e5619f281fe7
-code = 1000.33296dbbb2dc4f2c6b5c524d0a9e79bb.ad2e2b4a80c48a768e5e110fc6233b64
+ORGANIZATION_ID = 60020823522
+CLIENT_ID = 1000.F5SXT96LTYLGTH1KIEAP3RRQW3NF9Y
+CLIENT_SECRET = c59989b20b948e43cc2dd9f96c3277e5619f281fe7
+CODE = 1000.33296dbbb2dc4f2c6b5c524d0a9e79bb.ad2e2b4a80c48a768e5e110fc6233b64
 
 PAYMENT_GATEWAY = razorpay
 REGION = ap-south-1
-queueURL = https://sqs.ap-south-1.amazonaws.com/315872761357/uc-invoice-generation
+QUEUE_URL = https://sqs.ap-south-1.amazonaws.com/315872761357/uc-invoice-generation
 
-POSTGRES_user = postgres
-POSTGRES_host = localhost
-POSTGRES_database = postgres
-POSTGRES_password = postgres
-POSTGRES_port = 5432
+POSTGRES_USER = postgres
+POSTGRES_HOST = localhost
+POSTGRES_DATABASE = postgres
+POSTGRES_PASSWORD = postgres
+POSTGRES_PORT = 5432
 
-refresh_token = 1000.d5b444e911fc5307d64da689fee96e21.5008e56f288dede03b8150beed3c5da4
+REFRESH_TOKEN = 1000.d5b444e911fc5307d64da689fee96e21.5008e56f288dede03b8150beed3c5da4

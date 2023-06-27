@@ -1,3 +1,4 @@
+const envVariables = require('../helper/envHelper');
 var log4js = require('log4js');
 var logger = log4js.getLogger();
 logger.level = "all"
@@ -5,11 +6,11 @@ logger.level = "all"
 // postgres DB connection
 const Pool = require('pg').Pool
 const pool = new Pool({
-    user: process.env.POSTGRES_user,
-    host: process.env.POSTGRES_host,
-    database: process.env.POSTGRES_database,
-    password: process.env.POSTGRES_password,
-    port: process.env.POSTGRES_port,
+    user: envVariables.DB.POSTGRES_USER,
+    host: envVariables.DB.POSTGRES_HOST,
+    database: envVariables.DB.POSTGRES_DATABASE,
+    password: envVariables.DB.POSTGRES_PASSWORD,
+    port: envVariables.DB.POSTGRES_PORT,
 })
 
 // uuid import 

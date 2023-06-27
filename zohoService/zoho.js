@@ -1,3 +1,4 @@
+const envVariables = require('../helper/envHelper');
 const axios = require('axios');
 const get_access_token = require('./access_token_Module');
 
@@ -9,9 +10,9 @@ logger.level = "all"
 
 let zohoServices = {};
 
-// var organization_id = 60020823522;
-// var clientId = '1000.F5SXT96LTYLGTH1KIEAP3RRQW3NF9Y';
-// var clientsecret = 'c59989b20b948e43cc2dd9f96c3277e5619f281fe7';
+// var ORGANIZATION_ID = 60020823522;
+// var CLIENT_ID = '1000.F5SXT96LTYLGTH1KIEAP3RRQW3NF9Y';
+// var CLIENT_SECRET = 'c59989b20b948e43cc2dd9f96c3277e5619f281fe7';
 zohoServices.invoice = async(uhid, items_list, userObj, msg_id, correlationId) =>{
     try {
         // Step 1 - get auth code using client_id and client_secret
@@ -42,7 +43,7 @@ zohoServices.invoice = async(uhid, items_list, userObj, msg_id, correlationId) =
         // Step 3 - get ids of all the requested items using concept_id provided
         logger.trace("Step 3 started - getting ids of all the requested items using concept_id provided")
         let line_items = items_list.map(item =>{
-            return axios.get(`https://www.zohoapis.in/books/v3/items?cf_concept_id=${item.conceptId}&process.env.organization_id=${process.env.organization_id}`,config)
+            return axios.get(`https://www.zohoapis.in/books/v3/items?cf_concept_id=${item.conceptId}&organization_id=${envVariables.ORGANIZATION_ID}`,config)
             .then(result_res=>{
                 if(result_res.data.items.length >0){
                 let item_id = result_res.data.items[0].item_id;
@@ -64,7 +65,7 @@ zohoServices.invoice = async(uhid, items_list, userObj, msg_id, correlationId) =
 
             // Step 4 - Get user id from zoho Books or create a new user on the fly
             logger.trace("Step 4 started - Getting user id from zoho Books or else creating a new user on the fly")
-            let user_id = await axios.get(`https://www.zohoapis.in/books/v3/contacts?cf_uhid=${uhid}&process.env.organization_id=${process.env.organization_id}`,config)
+            let user_id = await axios.get(`https://www.zohoapis.in/books/v3/contacts?cf_uhid=${uhid}&organization_id=${envVariables.ORGANIZATION_ID}`,config)
             .then(res=>{
                 if(res.data.contacts.length > 0){
                     logger.info("Step 4 successfull - Got customer id from zoho Books"," correlationId Id: ",correlationId, " patient uhid: ",uhid)
@@ -72,7 +73,7 @@ zohoServices.invoice = async(uhid, items_list, userObj, msg_id, correlationId) =
                 }
                 else{
                     logger.warn("couldn't find contact in books, creating contact..."," correlationId Id: ",correlationId, " patient uhid: ",uhid);
-                    return axios.post(`https://www.zohoapis.in/books/v3/contacts?process.env.organization_id=${process.env.organization_id}`,userObj,config).then(result=>{
+                    return axios.post(`https://www.zohoapis.in/books/v3/contacts?organization_id=${envVariables.ORGANIZATION_ID}`,userObj,config).then(result=>{
                         logger.info("Step 4 successfull - created a new customer on the fly"," correlationId Id: ",correlationId, " patient uhid: ",uhid)
                         return result.data.contact.contact_id;
                     }).catch(err=>{
@@ -94,7 +95,7 @@ zohoServices.invoice = async(uhid, items_list, userObj, msg_id, correlationId) =
                         {
                             "configured": true,
                             "additional_field1": "standard",
-                            "gateway_name": process.env.PAYMENT_GATEWAY
+                            "gateway_name": envVariables.PAYMENT_GATEWAY
                         }
                     ]
                 }
@@ -102,7 +103,7 @@ zohoServices.invoice = async(uhid, items_list, userObj, msg_id, correlationId) =
 
             // Step 5 - create invoice and get invoice id to use in send email api
             logger.trace("Step 5 started - creating invoice and getting invoice id to use in send email api")
-            let invoice_details = await axios.post(`https://www.zohoapis.in/books/v3/invoices?process.env.organization_id=${process.env.organization_id}`, invoice_create_body, config)
+            let invoice_details = await axios.post(`https://www.zohoapis.in/books/v3/invoices?organization_id=${envVariables.ORGANIZATION_ID}`, invoice_create_body, config)
             .then(response_result =>{
                 logger.info(response_result.data.message," correlationId Id: ",correlationId, " patient uhid: ",uhid);
                 return response_result.data;
@@ -122,7 +123,7 @@ zohoServices.invoice = async(uhid, items_list, userObj, msg_id, correlationId) =
             }
 
             logger.trace("Step 6 started- Emailing the generated invoice to the customer for further processing.....")
-            let success_msg = await axios.post(`https://www.zohoapis.in/books/v3/invoices/${invoice_details.invoice.invoice_id}/email?process.env.organization_id=${process.env.organization_id}`,email_body,config)
+            let success_msg = await axios.post(`https://www.zohoapis.in/books/v3/invoices/${invoice_details.invoice.invoice_id}/email?organization_id=${envVariables.ORGANIZATION_ID}`,email_body,config)
             .then(res=>{
                 logger.info(res.data," correlationId Id: ",correlationId, " patient uhid: ",uhid)
                 return res.data

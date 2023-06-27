@@ -1,3 +1,4 @@
+const envVariables = require('../helper/envHelper');
 const axios = require('axios');
 // const file = require("./File_Ops");
 var log4js = require('log4js');
@@ -11,9 +12,9 @@ const get_access_token = async(uhid, correlationId) =>{
     //     logger.error(error);
     //     return;
     // });
-    let refresh_token = process.env.refresh_token
+    let refresh_token = envVariables.REFRESH_TOKEN
     if(refresh_token){
-        token = await axios.post(`https://accounts.zoho.in/oauth/v2/token?refresh_token=${refresh_token}&client_id=${process.env.clientId}&client_secret=${process.env.clientsecret}&redirect_uri=https://www.zoho.in/books&grant_type=refresh_token`)
+        token = await axios.post(`https://accounts.zoho.in/oauth/v2/token?refresh_token=${refresh_token}&client_id=${envVariables.CLIENT_ID}&client_secret=${envVariables.CLIENT_SECRET}&redirect_uri=https://www.zoho.in/books&grant_type=refresh_token`)
         .then(resp=>{
             if (resp.data.access_token) return resp.data;
             else{
@@ -31,7 +32,7 @@ const get_access_token = async(uhid, correlationId) =>{
         return token;
     }else{
         logger.warn("refresh token is not found in File System"," correlationId Id: ",correlationId, " patient uhid: ",uhid);
-        token = await axios.post(`https://accounts.zoho.in/oauth/v2/token?code=${process.env.code}&client_id=${process.env.clientId}&client_secret=${process.env.clientsecret}&redirect_uri=https://www.zoho.in/books&grant_type=authorization_code`)
+        token = await axios.post(`https://accounts.zoho.in/oauth/v2/token?code=${envVariables.CODE}&client_id=${envVariables.CLIENT_ID}&client_secret=${envVariables.CLIENT_SECRET}&redirect_uri=https://www.zoho.in/books&grant_type=authorization_code`)
         .then(res =>{
             if (res.data.access_token) return res.data;
             else{
