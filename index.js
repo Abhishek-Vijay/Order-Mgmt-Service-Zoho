@@ -53,6 +53,9 @@ const processMessage = async(message) => {
     logger.info('Received message:', message.Body);
     let msg = JSON.parse(message.Body);
     logger.info("Processing for the customer with"," correlation Id: ",msg.key.correlationId, " patient uhid: ",msg.key.clinicalUhid," encounter Id: ",msg.key.encounterId)
+
+    // checking all the informations are available in the SQS message or not
+    if(msg.key && msg.message && msg.key.hasOwnProperty('messageId') && msg.key.hasOwnProperty('encounterId') && msg.key.hasOwnProperty('patientId') && msg.key.hasOwnProperty('clinicalUhid') && msg.message.hasOwnProperty('orderItems') && msg.message.hasOwnProperty('personInfo') && msg.key.messageId && msg.key.encounterId && msg.key.patientId && msg.key.clinicalUhid && msg.message.orderItems){
     // inserting user meta-data in PATIENT Table
     let patient_insertion_id = await db.Patient_Insert(msg.key.clinicalUhid, msg.key.patientId, msg.key.correlationId).then(data=>data).catch(err=>{
         logger.error(err);
@@ -86,7 +89,6 @@ const processMessage = async(message) => {
     }else{
         if(typeof order_insertion == 'number'){
             logger.info(order_insertion," order is inserted in the UC_ORDER table"," with correlation Id: ",msg.key.correlationId," patient uhid: ",msg.key.clinicalUhid);
-            if(msg.key && msg.message && msg.key.hasOwnProperty('messageId') && msg.key.hasOwnProperty('encounterId') && msg.key.hasOwnProperty('patientId') && msg.key.hasOwnProperty('clinicalUhid') && msg.message.hasOwnProperty('orderItems') && msg.message.hasOwnProperty('personInfo')){
                 // zoho invoice function caller
                 let person_from_msg = msg.message.personInfo
                 let user = {
@@ -142,10 +144,10 @@ const processMessage = async(message) => {
                         logger.error("Error while deleting ", err);
                     };
                 }
-            }else{
-                logger.warn("Bad message request from SQS"," with correlation Id: ",msg.key.correlationId," patient uhid: ",msg.key.clinicalUhid);
-            }
         } 
+    }
+    }else{
+        logger.warn("Bad message request from SQS"," with correlation Id: ",msg.key.correlationId," patient uhid: ",msg.key.clinicalUhid);
     }
 }
 
