@@ -1,7 +1,7 @@
 const envVariables = require('../helper/envHelper');
 var log4js = require('log4js');
 var logger = log4js.getLogger();
-logger.level = "all"
+logger.level = "debug";
 
 // postgres DB connection
 const Pool = require('pg').Pool

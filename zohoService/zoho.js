@@ -6,16 +6,16 @@ let token;
 
 var log4js = require('log4js');
 var logger = log4js.getLogger();
-logger.level = "all"
+logger.level = "debug";
 
 let zohoServices = {};
 
 // var ORGANIZATION_ID = 60020823522;
 // var CLIENT_ID = '1000.F5SXT96LTYLGTH1KIEAP3RRQW3NF9Y';
 // var CLIENT_SECRET = 'c59989b20b948e43cc2dd9f96c3277e5619f281fe7';
-zohoServices.invoice = async(uhid, items_list, userObj, msg_id, correlationId) =>{
-    try {
-        // Step 1 - get auth code using client_id and client_secret
+
+const accessToken = async(correlationId,uhid) =>{
+    // Step 1 - get auth code using client_id and client_secret
         // Step 2 - To get access token using auth code
         if(token){
             // let token_time = await file.token_time_read().then(data => +data).catch(error => {
@@ -39,6 +39,24 @@ zohoServices.invoice = async(uhid, items_list, userObj, msg_id, correlationId) =
                 'content-type': 'application/json'
             }
         }
+        return config;
+}
+
+const zohoUserCreation = async(userObj, correlationId, uhid) =>{
+    let config = await accessToken(correlationId,uhid);
+    console.log(config);
+    return axios.post(`https://www.zohoapis.in/books/v3/contacts?organization_id=${envVariables.ORGANIZATION_ID}`,userObj,config).then(result=>{
+        logger.info("Step 4 successfull - created a new customer on the fly"," correlationId Id: ",correlationId, " patient uhid: ",uhid)
+        return result.data.contact.contact_id;
+    }).catch(err=>{
+        logger.error("step 4 at creating user error " + err.message," correlationId Id: ",correlationId, " patient uhid: ",uhid)
+        throw new Error("create user error, " + err.message);
+    })
+}
+
+zohoServices.invoice = async(uhid, items_list, userObj, msg_id, correlationId) =>{
+    try {
+        let config = await accessToken(correlationId, uhid); 
 
         // Step 3 - get ids of all the requested items using concept_id provided
         logger.trace("Step 3 started - getting ids of all the requested items using concept_id provided")
@@ -73,13 +91,7 @@ zohoServices.invoice = async(uhid, items_list, userObj, msg_id, correlationId) =
                 }
                 else{
                     logger.warn("couldn't find contact in books, creating contact..."," correlationId Id: ",correlationId, " patient uhid: ",uhid);
-                    return axios.post(`https://www.zohoapis.in/books/v3/contacts?organization_id=${envVariables.ORGANIZATION_ID}`,userObj,config).then(result=>{
-                        logger.info("Step 4 successfull - created a new customer on the fly"," correlationId Id: ",correlationId, " patient uhid: ",uhid)
-                        return result.data.contact.contact_id;
-                    }).catch(err=>{
-                        logger.error("step 4 at creating user error " + err.message," correlationId Id: ",correlationId, " patient uhid: ",uhid)
-                        throw new Error("create user error, " + err.message);
-                    })
+                    return zohoUserCreation(userObj,correlationId,uhid);
                 }
             })
             .catch(error=>{
@@ -147,4 +159,4 @@ zohoServices.invoice = async(uhid, items_list, userObj, msg_id, correlationId) =
     
 }
 
-module.exports = zohoServices;
+module.exports = {zohoServices, zohoUserCreation};

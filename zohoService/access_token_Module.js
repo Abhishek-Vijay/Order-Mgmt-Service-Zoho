@@ -3,7 +3,7 @@ const axios = require('axios');
 // const file = require("./File_Ops");
 var log4js = require('log4js');
 var logger = log4js.getLogger();
-logger.level = "all"
+logger.level = "debug";
 
 let token;
 token_timer = 0;

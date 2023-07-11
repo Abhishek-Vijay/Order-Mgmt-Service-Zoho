@@ -2,7 +2,7 @@
 var fs = require('fs');
 var log4js = require('log4js');
 var logger = log4js.getLogger();
-logger.level = "all"
+logger.level = "debug";
 
 let fileSys = {};
 
