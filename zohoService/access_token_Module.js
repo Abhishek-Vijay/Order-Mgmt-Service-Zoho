@@ -23,8 +23,8 @@ const get_access_token = async(uhid, correlationId) =>{
             }
         })
         .catch(error=>{
-            logger.error("step 2 error " + error.message," correlationId Id: ",correlationId, " patient uhid: ",uhid)
-            throw new Error("access token error, " + error.message);
+            logger.error("step 2 error " + error.response.data.message," correlationId Id: ",correlationId, " patient uhid: ",uhid)
+            throw new Error("access token error, " + error.response.data.message);
         })
         // logger.info("Token got using refresh token ",token);
         // current time in milliseconds from 1st jan 1970
@@ -41,8 +41,8 @@ const get_access_token = async(uhid, correlationId) =>{
             }
         })
         .catch(error=>{
-            logger.error("step 2 error " + error.message," correlationId Id: ",correlationId, " patient uhid: ",uhid)
-            throw new Error("access token error, " + error.message);
+            logger.error("step 2 error " + error.response.data.message," correlationId Id: ",correlationId, " patient uhid: ",uhid)
+            throw new Error("access token error, " + error.response.data.message);
         })
         // logger.info("Token got using auth code ",token);
         // caching the refresh token and expiration time - 

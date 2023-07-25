@@ -59,7 +59,7 @@ const processInvoiceMessage = async(message) => {
                                 {
                                     "first_name": `${person_from_msg.firstName}`,
                                     "last_name": `${person_from_msg.lastName}`,
-                                    "email": `${person_from_msg.emailId}`,
+                                    "email": `${person_from_msg.emailId.trim()}`,
                                     "is_primary_contact": true,
                                     "enable_portal": true
                                 }
@@ -74,7 +74,8 @@ const processInvoiceMessage = async(message) => {
                                     "placeholder": "cf_uhid",
                                     "value": `${msg.key.clinicalUhid}`
                                 }
-                            ]
+                            ],
+                        "gst_treatment": "consumer",
                     }
         
                     let invoice_response = await zohoServices.invoice(msg.key.clinicalUhid, msg.message.orderItems, user, msg.key.messageId, msg.key.correlationId).then(async(response)=>{
@@ -91,6 +92,7 @@ const processInvoiceMessage = async(message) => {
                             logger.error("INVOICE_FAILED ",err);
                             return;
                         });
+                        return error;
                     })
             
                     if(invoice_response){

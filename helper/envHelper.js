@@ -11,7 +11,7 @@ const envVariables = {
     PAYMENT_GATEWAY: get(env, 'PAYMENT_GATEWAY') || 'razorpay',
     REGION: get(env, 'REGION') || 'ap-south-1',
     INVOICE_QUEUE_URL: get(env, 'INVOICE_QUEUE_URL') || 'https://sqs.ap-south-1.amazonaws.com/315872761357/local-uc-invoice-generation',
-    PERSON_QUEUE_URL: get(env, 'PERSON_QUEUE_URL') || 'https://sqs.ap-south-1.amazonaws.com/315872761357/dev-uc-clinical-person-info',
+    PERSON_QUEUE_URL: get(env, 'PERSON_QUEUE_URL') || 'https://sqs.ap-south-1.amazonaws.com/315872761357/local-uc-clinical-person-info',
     DB: {
         POSTGRES_USER: get(env, 'POSTGRES_USER') || 'postgres',
         POSTGRES_HOST: get(env, 'POSTGRES_HOST') || 'localhost',

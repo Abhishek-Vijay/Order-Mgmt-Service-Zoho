@@ -14,6 +14,28 @@ let zohoServices = {};
 // var CLIENT_ID = '1000.F5SXT96LTYLGTH1KIEAP3RRQW3NF9Y';
 // var CLIENT_SECRET = 'c59989b20b948e43cc2dd9f96c3277e5619f281fe7';
 
+axios.interceptors.response.use( undefined, async(err) => {
+    const { config, response } = err;
+    console.log("came in the Axios Interceptor");
+    if (!config || !config.retry) {
+      return Promise.reject(err);
+    }
+    // retry while Network timeout or Network Error
+    logger.warn("Got response code ",response.status);
+    if (!(response.status == 500 || response.status == 502 || response.status == 503 || response.status == 504)) {
+        return Promise.reject(err);
+    }
+    config.retry -= 1;
+    const delayRetryRequest = new Promise((resolve) => {
+      setTimeout(() => {
+        logger.warn("retrying the request......", config.url);
+        resolve();
+      }, config.retryDelay || 2000);
+    });
+    await delayRetryRequest;
+    return axios(config);
+  });
+
 const accessToken = async(correlationId,uhid) =>{
     // Step 1 - get auth code using client_id and client_secret
         // Step 2 - To get access token using auth code
@@ -37,7 +59,8 @@ const accessToken = async(correlationId,uhid) =>{
             headers:{
                 Authorization: `Zoho-oauthtoken ${token.access_token}`,
                 'content-type': 'application/json'
-            }
+            },
+            retry: 3
         }
         return config;
 }
@@ -45,18 +68,40 @@ const accessToken = async(correlationId,uhid) =>{
 const zohoUserCreation = async(userObj, correlationId, uhid) =>{
     let config = await accessToken(correlationId,uhid);
     console.log(config);
-    return axios.post(`https://www.zohoapis.in/books/v3/contacts?organization_id=${envVariables.ORGANIZATION_ID}`,userObj,config).then(result=>{
-        logger.info("Step 4 successfull - created a new customer on the fly"," correlationId Id: ",correlationId, " patient uhid: ",uhid)
-        return result.data.contact.contact_id;
-    }).catch(err=>{
-        logger.error("step 4 at creating user error " + err.message," correlationId Id: ",correlationId, " patient uhid: ",uhid)
-        throw new Error("create user error, " + err.message);
-    })
+    return axios.get(`https://www.zohoapis.in/books/v3/contacts?cf_uhid=${uhid}&organization_id=${envVariables.ORGANIZATION_ID}`,config)
+            .then(res=>{
+                if(res.data.contacts.length > 0){
+                    logger.info("Step 4 successfull - Got customer id from zoho Books, won't create a new customer"," correlationId Id: ",correlationId, " patient uhid: ",uhid)
+                    return res.data.contacts[0].contact_id;
+                }
+                else{
+                    logger.warn("couldn't find contact in books, creating contact..."," correlationId Id: ",correlationId, " patient uhid: ",uhid);
+                    return axios.post(`https://www.zohoapis.in/books/v3/contacts?organization_id=${envVariables.ORGANIZATION_ID}`,userObj,config).then(result=>{
+                        logger.info("Step 4 successfull - created a new customer on the fly"," correlationId Id: ",correlationId, " patient uhid: ",uhid)
+                        return result.data.contact.contact_id;
+                    }).catch(err=>{
+                        logger.error("step 4 at creating user error " + err.response.data.message," correlationId Id: ",correlationId, " patient uhid: ",uhid)
+                        throw new Error("create user error, " + err.response.data.message);
+                    })
+                }
+            })
+            .catch(error=>{
+                logger.error("step 4 at getting user error " + error.response.data.message," correlationId Id: ",correlationId, " patient uhid: ",uhid);
+                throw new Error("get user error, " + error.response.data.message);
+            })
 }
 
 zohoServices.invoice = async(uhid, items_list, userObj, msg_id, correlationId) =>{
     try {
         let config = await accessToken(correlationId, uhid); 
+        // let testing = await axios.get('http://localhost:7000/testingAPI', config).then(res=>{
+        //     console.log("promise resolved");
+        //     console.log(res);
+        // }).catch(err=>{
+        //     console.log(err);
+        //     console.log("promise rejected error");
+        //     throw new Error(err);   // important to throw the error to call the interceptor
+        // })
 
         // Step 3 - get ids of all the requested items using concept_id provided
         logger.trace("Step 3 started - getting ids of all the requested items using concept_id provided")
@@ -71,6 +116,10 @@ zohoServices.invoice = async(uhid, items_list, userObj, msg_id, correlationId) =
                 logger.warn("no item found with concept_id "+ item.conceptId +" on message id =>"+msg_id," correlationId Id: ",correlationId, " patient uhid: ",uhid);
                 throw new Error("no item found with concept_id "+item.conceptId);
             }).catch(err=>{
+                if(err.response){
+                    logger.error("step 3 at getting items list error " + err.response.data.message +" on message id =>"+msg_id," correlationId Id: ",correlationId, " patient uhid: ",uhid)
+                    throw new Error("get items list error, " + err.response.data.message);
+                }
                 logger.error("step 3 at getting items list error " + err.message +" on message id =>"+msg_id," correlationId Id: ",correlationId, " patient uhid: ",uhid)
                 throw new Error("get items list error, " + err.message);
             })
@@ -83,21 +132,7 @@ zohoServices.invoice = async(uhid, items_list, userObj, msg_id, correlationId) =
 
             // Step 4 - Get user id from zoho Books or create a new user on the fly
             logger.trace("Step 4 started - Getting user id from zoho Books or else creating a new user on the fly")
-            let user_id = await axios.get(`https://www.zohoapis.in/books/v3/contacts?cf_uhid=${uhid}&organization_id=${envVariables.ORGANIZATION_ID}`,config)
-            .then(res=>{
-                if(res.data.contacts.length > 0){
-                    logger.info("Step 4 successfull - Got customer id from zoho Books"," correlationId Id: ",correlationId, " patient uhid: ",uhid)
-                    return res.data.contacts[0].contact_id;
-                }
-                else{
-                    logger.warn("couldn't find contact in books, creating contact..."," correlationId Id: ",correlationId, " patient uhid: ",uhid);
-                    return zohoUserCreation(userObj,correlationId,uhid);
-                }
-            })
-            .catch(error=>{
-                logger.error("step 4 at getting user error " + error.message," correlationId Id: ",correlationId, " patient uhid: ",uhid);
-                throw new Error("get user error, " + error.message);
-            })
+            let user_id = await zohoUserCreation(userObj,correlationId,uhid);
 
             let invoice_create_body = {
                 "customer_id": user_id,
@@ -120,8 +155,8 @@ zohoServices.invoice = async(uhid, items_list, userObj, msg_id, correlationId) =
                 logger.info(response_result.data.message," correlationId Id: ",correlationId, " patient uhid: ",uhid);
                 return response_result.data;
             }).catch(err=>{
-                logger.error("step 5 invoice creation error " + err.message +" on message id =>"+msg_id," correlationId Id: ",correlationId, " patient uhid: ",uhid)
-                throw new Error("invoice creation error, " + err.message);
+                logger.error("step 5 invoice creation error " + err.response.data.message +" on message id =>"+msg_id," correlationId Id: ",correlationId, " patient uhid: ",uhid)
+                throw new Error("invoice creation error, " + err.response.data.message);
             }) 
 
             // Step 6 - Email the generated invoice to user for further processing
@@ -140,8 +175,8 @@ zohoServices.invoice = async(uhid, items_list, userObj, msg_id, correlationId) =
                 logger.info(res.data," correlationId Id: ",correlationId, " patient uhid: ",uhid)
                 return res.data
             }).catch(err=>{
-                logger.error("Email sending to user error, " + err.message +" on message id =>"+msg_id," correlationId Id: ",correlationId, " patient uhid: ",uhid)
-                throw new Error("Email sending to user error, " + err.message);
+                logger.error("Email sending to user error, " + err.response.data.message +" on message id =>"+msg_id," correlationId Id: ",correlationId, " patient uhid: ",uhid)
+                throw new Error("Email sending to user error, " + err.response.data.message);
             })
 
             if(success_msg){
@@ -149,6 +184,10 @@ zohoServices.invoice = async(uhid, items_list, userObj, msg_id, correlationId) =
                 return {msg_id, invoice_no, correlationId};
             }
         }).catch(error=>{
+            if(error.response){
+                logger.error("Promise resolve error for list of items array, " + error.response.data.message +" on message id =>"+msg_id," correlationId Id: ",correlationId, " patient uhid: ",uhid)
+                throw new Error("Promise resolve error for list of items array, " + error.response.data.message +" on message id <>"+msg_id+"<> correlationId Id ->"+correlationId); 
+            }
             logger.error("Promise resolve error for list of items array, " + error.message +" on message id =>"+msg_id," correlationId Id: ",correlationId, " patient uhid: ",uhid)
             throw new Error("Promise resolve error for list of items array, " + error.message +" on message id <>"+msg_id+"<> correlationId Id ->"+correlationId);
         })

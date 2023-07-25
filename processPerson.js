@@ -16,8 +16,11 @@ const processPersonMessage = async(message) =>{
     let msg = JSON.parse(message.Body);
     logger.info("Processing for the customer with"," correlation Id: ",msg.key.correlationId, " patient uhid: ",msg.key.clinicalUhid);
 
+    // Regex to check email Id format provided in the message received from SQS.
+    let regex = new RegExp('^[^\s][a-z0-9._@]+@[a-z]+\.[a-z]{2,3}$');
+    let emailId = msg.message.personInfo.emailId.trim();
     // checking all the informations are available in the SQS message or not
-    if(msg.key && msg.message && msg.key.hasOwnProperty('messageId') && msg.key.hasOwnProperty('patientId') && msg.key.hasOwnProperty('clinicalUhid') && msg.message.hasOwnProperty('personInfo') &&msg.message.personInfo && msg.message.personInfo.firstName){
+    if(msg.key && msg.message && msg.key.hasOwnProperty('messageId') && msg.key.hasOwnProperty('patientId') && msg.key.hasOwnProperty('clinicalUhid') && msg.message.hasOwnProperty('personInfo') &&msg.message.personInfo && msg.message.personInfo.firstName && regex.test(emailId)){
         logger.info("Creating Customer in Zoho Books....");
         let person_from_msg = msg.message.personInfo
         let user = {
@@ -26,7 +29,7 @@ const processPersonMessage = async(message) =>{
                     {
                         "first_name": `${person_from_msg.firstName}`,
                         "last_name": `${person_from_msg.lastName}`,
-                        "email": `${person_from_msg.emailId}`,
+                        "email": `${emailId}`,
                         "is_primary_contact": true,
                         "enable_portal": true
                     }
@@ -41,7 +44,9 @@ const processPersonMessage = async(message) =>{
                         "placeholder": "cf_uhid",
                         "value": `${msg.key.clinicalUhid}`
                     }
-                ]
+                ],
+            "gst_treatment": "consumer",
+            
         }
 
         let customer_response = await zohoUserCreation(user, msg.key.correlationId, msg.key.clinicalUhid).then((response)=>{
