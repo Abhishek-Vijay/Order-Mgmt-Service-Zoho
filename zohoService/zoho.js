@@ -2,6 +2,11 @@ const envVariables = require('../helper/envHelper');
 const axios = require('axios');
 const get_access_token = require('./access_token_Module');
 
+// S3 related imports
+const { S3Client, PutObjectCommand} = require("@aws-sdk/client-s3");
+// Create an Amazon S3 service client object.
+const s3Client = new S3Client({ region: envVariables.REGION });
+
 let token;
 
 var log4js = require('log4js');
@@ -91,7 +96,7 @@ const zohoUserCreation = async(userObj, correlationId, uhid) =>{
             })
 }
 
-zohoServices.invoice = async(uhid, items_list, userObj, msg_id, correlationId) =>{
+zohoServices.invoice = async(uhid, items_list, userObj, msg_id, correlationId, encounterId) =>{
     try {
         let config = await accessToken(correlationId, uhid); 
         // let testing = await axios.get('http://localhost:7000/testingAPI', config).then(res=>{
@@ -166,22 +171,52 @@ zohoServices.invoice = async(uhid, items_list, userObj, msg_id, correlationId) =
                     userObj.contact_persons[0].email
                 ],
                 "subject": `Invoice from Tata Urban Clinic (Invoice#: ${invoice_details.invoice.invoice_number})`,
-                "body": `Dear Customer,         <br><br>Thanks for your business.         <br><br>The invoice ${invoice_details.invoice.invoice_number} is attached with this email. You can choose the easy way out and <a href= ${invoice_details.invoice.invoice_url.replace("/secure","/securepay")}  >pay online for this invoice.</a>         <br><br>Here's an overview of the invoice for your reference.         <br><br>Invoice Overview:         <br>Invoice  : ${invoice_details.invoice.invoice_number}         <br>Date : ${invoice_details.invoice.date}         <br>Amount : ${invoice_details.invoice.currency_symbol} ${invoice_details.invoice.total}         <br><br>Thank you for giving us this opportunity to serve you. In case of any queries, please reach out to us at 08069156999.<br><br>\nRegards<br>\nTata Urban Clinic<br>\n`
+                "body": `Dear Customer,         <br><br>Thanks for your business.         <br><br>The invoice ${invoice_details.invoice.invoice_number} is attached with this email. You can choose the easy way out and <a href= ${invoice_details.invoice.invoice_url.replace("/secure","/securepay")}  >pay online for this invoice.</a>         <br><br>Here's an overview of the invoice for your reference.         <br><br>Invoice Overview:         <br>Invoice  : ${invoice_details.invoice.invoice_number}         <br>Date : ${invoice_details.invoice.date}         <br>Amount : ${invoice_details.invoice.currency_symbol} ${invoice_details.invoice.total}         <br><br>Thank you for giving us the opportunity to serve you. In case of any queries, please reach out to us at 08069156999.<br><br>\nRegards<br>\nTata Urban Clinic<br>\n`
             }
 
             logger.trace("Step 6 started- Emailing the generated invoice to the customer for further processing.....")
             let success_msg = await axios.post(`https://www.zohoapis.in/books/v3/invoices/${invoice_details.invoice.invoice_id}/email?organization_id=${envVariables.ORGANIZATION_ID}`,email_body,config)
             .then(res=>{
                 logger.info(res.data," correlationId Id: ",correlationId, " patient uhid: ",uhid)
-                return res.data
+                return res.data;
             }).catch(err=>{
-                logger.error("Email sending to user error, " + err.response.data.message +" on message id =>"+msg_id," correlationId Id: ",correlationId, " patient uhid: ",uhid)
-                throw new Error("Email sending to user error, " + err.response.data.message);
+                logger.error("sending Email to user error, " + err.response.data.message +" on message id =>"+msg_id," correlationId Id: ",correlationId, " patient uhid: ",uhid)
+                throw new Error("sending Email to user error, " + err.response.data.message);
             })
 
+            // Step 7 - Get Invoice in pdf format and save it to amazon S3 bucket
+            let new_config = config;
+            new_config['responseType'] = 'arraybuffer'
+            let invoice_in_pdf = await axios.get(`https://www.zohoapis.in/books/v3/invoices/${invoice_details.invoice.invoice_id}?organization_id=${envVariables.ORGANIZATION_ID}&accept=pdf`,new_config)
+            .then(res=>{
+                logger.info(res.data," correlationId Id: ",correlationId, " patient uhid: ",uhid)
+                return res.data
+            }).catch(err=>{
+                logger.error("Getting invoice in pdf format error, " + err.response.data.message +" on message id =>"+msg_id," correlationId Id: ",correlationId, " patient uhid: ",uhid)
+                // throw new Error("Getting invoice in pdf format error, " + err.response.data.message);
+            })
+
+            // Set the parameters for S3 Bucket
+            const params = {
+                Bucket: `${envVariables.S3_BUCKET}`, // The name of the bucket. For example, 'sample-bucket-101'.
+                Key: `${envVariables.DEPLOYMENT_ENV}/${envVariables.S3_FOLDER}/${uhid}/${encounterId}/${invoice_details.invoice.invoice_number}.pdf`, // The name of the object. For example, 'sample_upload.txt'.
+                Body: invoice_in_pdf, // The content of the object. For example, 'Hello world!".
+            };
+
+            let s3_bucket_url;
+            try {
+                const results = await s3Client.send(new PutObjectCommand(params));
+                logger.info("Successfully created " + params.Key + " and uploaded it to " + params.Bucket + "/" + params.Key);
+                // return results; // For unit tests.
+                s3_bucket_url = `https://${envVariables.S3_BUCKET}.s3.${envVariables.REGION}.amazonaws.com/${envVariables.DEPLOYMENT_ENV}/${envVariables.S3_FOLDER}/${uhid}/${encounterId}/${invoice_details.invoice.invoice_number}.pdf`
+              } catch (err) {
+                logger.error("Error while uploading invoice pdf in S3 Bucket: ", err);
+            }
+
             if(success_msg){
-                let invoice_no = invoice_details.invoice.invoice_number
-                return {msg_id, invoice_no, correlationId};
+                let invoice_no = invoice_details.invoice.invoice_number;
+                let invoice_url = invoice_details.invoice.invoice_url;
+                return {msg_id, invoice_no, invoice_url, s3_bucket_url, correlationId};
             }
         }).catch(error=>{
             if(error.response){

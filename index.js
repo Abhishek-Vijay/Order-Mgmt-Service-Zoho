@@ -73,6 +73,21 @@ const readingSQSMsg = async() =>{
         readingSQSMsg();}, 2500);
 }
 
+// API to get invoice url for mobile app to use.
+app.get('/order-mgmt/:uuid/payment-invoice', async(req,res)=>{
+    // console.log(req.params.uuid);
+    await db.Order_Invoice_Urls(req.params.uuid).then(data=>{
+        res.statusCode = 200;
+        res.json(data);
+    }).catch(err=>{
+        logger.error(err);
+        res.statusCode = 404;
+        res.json(err);
+    });  
+    
+})
+
+// Payment webhook for payment notification.
 app.post('/paymentHook', async(req, res) => {
     // check if verification token is correct
     if (req.headers.token !== envVariables.TOKEN) {
