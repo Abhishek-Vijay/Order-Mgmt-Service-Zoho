@@ -74,11 +74,24 @@ const readingSQSMsg = async() =>{
 }
 
 // API to get invoice url for mobile app to use.
-app.get('/order-mgmt/:uuid/payment-invoice', async(req,res)=>{
+app.get('/order-mgmt/patient/:uuid/payment-invoice', async(req,res)=>{
     // console.log(req.params.uuid);
     await db.Order_Invoice_Urls(req.params.uuid).then(data=>{
-        res.statusCode = 200;
-        res.json(data);
+        if(data.length){
+            let formattedData = data.map(obj=>{
+                return {
+                    encounterId: obj.encounter_id,
+                    invoiceNumber: obj.invoice_number,
+                    invoiceUrl: obj.invoice_url,
+                    processingStatus: obj.processing_status
+                }
+            });
+            res.statusCode = 200;
+            res.json(formattedData);
+        }else{
+            res.statusCode = 200;
+            res.json(data);
+        }
     }).catch(err=>{
         logger.error(err);
         res.statusCode = 404;
@@ -104,6 +117,7 @@ app.post('/paymentHook', async(req, res) => {
             logger.error(err);
             return;
         });
+        await db.Order_Txn_Logs_Webhook_Update(req.body.invoice_number, status);
     }
     // return a text response
     const data = { type: 'Received' };

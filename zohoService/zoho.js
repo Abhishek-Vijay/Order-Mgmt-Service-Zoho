@@ -10,10 +10,13 @@ const s3Client = new S3Client({ region: envVariables.REGION });
 let token;
 
 var log4js = require('log4js');
+const db = require('../db/DBModule');
 var logger = log4js.getLogger();
 logger.level = "debug";
 
 let zohoServices = {};
+let txn_logs = [];
+let log_index = 1;
 
 // var ORGANIZATION_ID = 60020823522;
 // var CLIENT_ID = '1000.F5SXT96LTYLGTH1KIEAP3RRQW3NF9Y';
@@ -43,7 +46,7 @@ axios.interceptors.response.use( undefined, async(err) => {
 
 const accessToken = async(correlationId,uhid) =>{
     // Step 1 - get auth code using client_id and client_secret
-        // Step 2 - To get access token using auth code
+        // Step 1 - To get access token using auth code
         if(token){
             // let token_time = await file.token_time_read().then(data => +data).catch(error => {
             //     logger.error(error);
@@ -76,22 +79,22 @@ const zohoUserCreation = async(userObj, correlationId, uhid) =>{
     return axios.get(`https://www.zohoapis.in/books/v3/contacts?cf_uhid=${uhid}&organization_id=${envVariables.ORGANIZATION_ID}`,config)
             .then(res=>{
                 if(res.data.contacts.length > 0){
-                    logger.info("Step 4 successfull - Got customer id from zoho Books, won't create a new customer"," correlationId Id: ",correlationId, " patient uhid: ",uhid)
+                    logger.info("Step 2 successfull - Got customer id from zoho Books, won't create a new customer"," correlationId Id: ",correlationId, " patient uhid: ",uhid);
                     return res.data.contacts[0].contact_id;
                 }
                 else{
                     logger.warn("couldn't find contact in books, creating contact..."," correlationId Id: ",correlationId, " patient uhid: ",uhid);
                     return axios.post(`https://www.zohoapis.in/books/v3/contacts?organization_id=${envVariables.ORGANIZATION_ID}`,userObj,config).then(result=>{
-                        logger.info("Step 4 successfull - created a new customer on the fly"," correlationId Id: ",correlationId, " patient uhid: ",uhid)
+                        logger.info("Step 2 successfull - created a new customer on the fly"," correlationId Id: ",correlationId, " patient uhid: ",uhid);
                         return result.data.contact.contact_id;
                     }).catch(err=>{
-                        logger.error("step 4 at creating user error " + err.response.data.message," correlationId Id: ",correlationId, " patient uhid: ",uhid)
+                        logger.error("step 2 at creating user error " + err.response.data.message," correlationId Id: ",correlationId, " patient uhid: ",uhid)
                         throw new Error("create user error, " + err.response.data.message);
                     })
                 }
             })
             .catch(error=>{
-                logger.error("step 4 at getting user error " + error.response.data.message," correlationId Id: ",correlationId, " patient uhid: ",uhid);
+                logger.error("step 2 at getting user error " + error.response.data.message," correlationId Id: ",correlationId, " patient uhid: ",uhid);
                 throw new Error("get user error, " + error.response.data.message);
             })
 }
@@ -116,16 +119,28 @@ zohoServices.invoice = async(uhid, items_list, userObj, msg_id, correlationId, e
                 if(result_res.data.items.length >0){
                 let item_id = result_res.data.items[0].item_id;
                 logger.info("item found with concept_id ",item.conceptId," correlationId Id: ",correlationId, " patient uhid: ",uhid);
+                txn_logs.push(`{${log_index}:"${"Step 3 : item found with concept_id =>"+ item.conceptId +", on message id =>"+msg_id+ ", patient uhid =>"+ uhid}"}`);
+                log_index++;
                 return {item_id,quantity:item.quantity}
                 }
                 logger.warn("no item found with concept_id "+ item.conceptId +" on message id =>"+msg_id," correlationId Id: ",correlationId, " patient uhid: ",uhid);
+                txn_logs.push(`{${log_index}:"${"Step 3 : no item found with concept_id =>"+ item.conceptId +", on message id =>"+msg_id+ ", patient uhid =>"+ uhid}"}`);
+                // log_index++;
                 throw new Error("no item found with concept_id "+item.conceptId);
-            }).catch(err=>{
+            }).catch(async err=>{
                 if(err.response){
                     logger.error("step 3 at getting items list error " + err.response.data.message +" on message id =>"+msg_id," correlationId Id: ",correlationId, " patient uhid: ",uhid)
+                    txn_logs.push(`{${log_index}:"${"Step 3 : getting items list error, " + err.response.data.message +", on message id =>"+msg_id+ ", patient uhid =>"+ uhid}"}`);
+                    // log_index++;
+                    await db.Order_Txn_Logs_Insert(msg_id, txn_logs);
+                    txn_logs = [];
+                    log_index = 1;
                     throw new Error("get items list error, " + err.response.data.message);
                 }
                 logger.error("step 3 at getting items list error " + err.message +" on message id =>"+msg_id," correlationId Id: ",correlationId, " patient uhid: ",uhid)
+                await db.Order_Txn_Logs_Insert(msg_id, txn_logs);
+                txn_logs = [];
+                log_index = 1;
                 throw new Error("get items list error, " + err.message);
             })
         })
@@ -134,9 +149,11 @@ zohoServices.invoice = async(uhid, items_list, userObj, msg_id, correlationId, e
         logger.trace("resolving line_items promise started.....") 
         return Promise.all(line_items).then(async line_items_values=>{
             logger.info("line items ids found",line_items_values," correlationId Id: ",correlationId, " patient uhid: ",uhid);
+            await db.Order_Txn_Logs_Insert(msg_id, txn_logs);
+            txn_logs = [];
 
-            // Step 4 - Get user id from zoho Books or create a new user on the fly
-            logger.trace("Step 4 started - Getting user id from zoho Books or else creating a new user on the fly")
+            // Step 2 - Get user id from zoho Books or create a new user on the fly
+            logger.trace("Step 2 started - Getting user id from zoho Books or else creating a new user on the fly")
             let user_id = await zohoUserCreation(userObj,correlationId,uhid);
 
             let invoice_create_body = {
@@ -153,18 +170,25 @@ zohoServices.invoice = async(uhid, items_list, userObj, msg_id, correlationId, e
                 }
             }
 
-            // Step 5 - create invoice and get invoice id to use in send email api
-            logger.trace("Step 5 started - creating invoice and getting invoice id to use in send email api")
+            // Step 4 - create invoice and get invoice id to use in send email api
+            logger.trace("Step 4 started - creating invoice and getting invoice id to use in send email api")
             let invoice_details = await axios.post(`https://www.zohoapis.in/books/v3/invoices?organization_id=${envVariables.ORGANIZATION_ID}`, invoice_create_body, config)
             .then(response_result =>{
                 logger.info(response_result.data.message," correlationId Id: ",correlationId, " patient uhid: ",uhid);
+                txn_logs.push(`{${log_index}:"${"Step 4 : Invoice is created successfully, " +"on message id =>"+msg_id+ ", patient uhid =>"+ uhid}"}`);
+                log_index++;
                 return response_result.data;
-            }).catch(err=>{
-                logger.error("step 5 invoice creation error " + err.response.data.message +" on message id =>"+msg_id," correlationId Id: ",correlationId, " patient uhid: ",uhid)
+            }).catch(async err=>{
+                logger.error("step 4 invoice creation error " + err.response.data.message +" on message id =>"+msg_id," correlationId Id: ",correlationId, " patient uhid: ",uhid);
+                txn_logs.push(`{${log_index}:"${"Step 4 : Got error while creating Invoice, "+ err.response.data.message +", on message id =>"+msg_id+ " patient uhid =>"+ uhid}"}`);
+                // log_index++;
+                await db.Order_Txn_Logs_Update(msg_id, txn_logs);
+                txn_logs = [];
+                log_index = 1;
                 throw new Error("invoice creation error, " + err.response.data.message);
             }) 
 
-            // Step 6 - Email the generated invoice to user for further processing
+            // Step 5 - Email the generated invoice to user for further processing
             let email_body = {
                 "send_from_org_email_id": false,
                 "to_mail_ids": [
@@ -174,17 +198,27 @@ zohoServices.invoice = async(uhid, items_list, userObj, msg_id, correlationId, e
                 "body": `Dear Customer,         <br><br>Thanks for your business.         <br><br>The invoice ${invoice_details.invoice.invoice_number} is attached with this email. You can choose the easy way out and <a href= ${invoice_details.invoice.invoice_url.replace("/secure","/securepay")}  >pay online for this invoice.</a>         <br><br>Here's an overview of the invoice for your reference.         <br><br>Invoice Overview:         <br>Invoice  : ${invoice_details.invoice.invoice_number}         <br>Date : ${invoice_details.invoice.date}         <br>Amount : ${invoice_details.invoice.currency_symbol} ${invoice_details.invoice.total}         <br><br>Thank you for giving us the opportunity to serve you. In case of any queries, please reach out to us at 08069156999.<br><br>\nRegards<br>\nTata Urban Clinic<br>\n`
             }
 
-            logger.trace("Step 6 started- Emailing the generated invoice to the customer for further processing.....")
+            logger.trace("Step 5 started- Emailing the generated invoice to the customer for further processing.....")
             let success_msg = await axios.post(`https://www.zohoapis.in/books/v3/invoices/${invoice_details.invoice.invoice_id}/email?organization_id=${envVariables.ORGANIZATION_ID}`,email_body,config)
             .then(res=>{
-                logger.info(res.data," correlationId Id: ",correlationId, " patient uhid: ",uhid)
+                logger.info(res.data," correlationId Id: ",correlationId, " patient uhid: ",uhid);
+                txn_logs.push(`{${log_index}:"${"Step 5 : Invoice sent through Email to customer," +" on message id =>"+msg_id+ ", patient uhid =>"+ uhid}"}`);
+                log_index++;
                 return res.data;
-            }).catch(err=>{
-                logger.error("sending Email to user error, " + err.response.data.message +" on message id =>"+msg_id," correlationId Id: ",correlationId, " patient uhid: ",uhid)
-                throw new Error("sending Email to user error, " + err.response.data.message);
+            }).catch(async err=>{
+                logger.error("sending Email to customer error, " + err.response.data.message +" on message id =>"+msg_id," correlationId Id: ",correlationId, ", patient uhid: ",uhid)
+                txn_logs.push(`{${log_index}:"${"Step 5 : sending Email to customer error, " + err.response.data.message +", on message id =>"+msg_id+ ", patient uhid: "+ uhid}"}`);
+                // log_index++;
+                await db.Order_Txn_Logs_Update(msg_id, txn_logs);
+                txn_logs = [];
+                log_index = 1;
+                throw new Error("sending Email to customer error, " + err.response.data.message);
             })
+            await db.Order_Txn_Logs_Update(msg_id, txn_logs);
+            txn_logs = [];
+            log_index = 1;
 
-            // Step 7 - Get Invoice in pdf format and save it to amazon S3 bucket
+            // Step 6 - Get Invoice in pdf format and save it to amazon S3 bucket
             let new_config = config;
             new_config['responseType'] = 'arraybuffer'
             let invoice_in_pdf = await axios.get(`https://www.zohoapis.in/books/v3/invoices/${invoice_details.invoice.invoice_id}?organization_id=${envVariables.ORGANIZATION_ID}&accept=pdf`,new_config)
