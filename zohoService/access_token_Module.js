@@ -18,12 +18,15 @@ const get_access_token = async(uhid, correlationId) =>{
         .then(resp=>{
             if (resp.data.access_token) return resp.data;
             else{
-                logger.error(resp.data.error," correlationId Id: ",correlationId, " patient uhid: ",uhid)
+                logger.error(resp.data.error," correlationId Id: ",correlationId, " patient uhid: ",uhid);
+                // txn_logs.push(`{${log_index}:"${"Step 1 - got access token error after API call, "+ resp.data.error +", patient uhid =>"+ uhid}"}`);
                 throw new Error(resp.data.error)
             }
         })
         .catch(error=>{
-            logger.error("step 2 error " + error.response.data.message," correlationId Id: ",correlationId, " patient uhid: ",uhid)
+            logger.error("step 1 error " + error.response.data.message," correlationId Id: ",correlationId, " patient uhid: ",uhid);
+            // txn_logs.push(`{${log_index}:"${"Step 1 - got error while trying to get access token from API call, "+ error.response.data.message +", patient uhid =>"+ uhid}"}`);
+            // log_index++;
             throw new Error("access token error, " + error.response.data.message);
         })
         // logger.info("Token got using refresh token ",token);

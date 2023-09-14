@@ -49,7 +49,15 @@ const processPersonMessage = async(message) =>{
             
         }
 
-        let customer_response = await zohoUserCreationOrUpdation(user, msg.key.correlationId, msg.key.clinicalUhid).then((response)=>{
+        // inserting user meta-data in PATIENT Table
+        let patient_insertion_id = await db.Patient_Insert(msg.key.clinicalUhid, msg.key.patientId, msg.key.correlationId).then(data=>data).catch(err=>{
+            logger.error(err);
+            return;
+        }); 
+
+        logger.info("patient insertion successfull ", patient_insertion_id," correlation Id: ",msg.key.correlationId);
+
+        let customer_response = await zohoUserCreation(user, msg.key.correlationId, msg.key.clinicalUhid).then((response)=>{
             logger.info("success response",response);
             return response;
         }).catch((error)=>{

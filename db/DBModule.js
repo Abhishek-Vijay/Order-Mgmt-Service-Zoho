@@ -1,3 +1,4 @@
+const { reject } = require('lodash');
 const envVariables = require('../helper/envHelper');
 var log4js = require('log4js');
 var logger = log4js.getLogger();
@@ -108,7 +109,7 @@ DBModule.Order_Insert = (id, encounter_id, clinical_uhid, order_details, correla
                 if(res.rows.length == 0){
                     let current_date = new Date().toLocaleString();
                     let processing_status = 'IN_PROGRESS';
-                    pool.query('INSERT INTO UC_ORDER (id, encounter_id, clinical_uhid, order_details, invoice_number , processing_status, created_at, updated_at) VALUES ($1, $2, $3, $4, null, $5, $6, $6) RETURNING *', [id, encounter_id, clinical_uhid, order_details, processing_status, current_date], (error, results) => {
+                    pool.query('INSERT INTO UC_ORDER (id, encounter_id, clinical_uhid, order_details, invoice_number, invoice_url, s3_bucket_url, processing_status, created_at, updated_at) VALUES ($1, $2, $3, $4, null, null, null, $5, $6, $6) RETURNING *', [id, encounter_id, clinical_uhid, order_details, processing_status, current_date], (error, results) => {
                         if (error) {
                             logger.error(error," correlationId Id: ",correlationId);
                             reject(error);
@@ -127,11 +128,11 @@ DBModule.Order_Insert = (id, encounter_id, clinical_uhid, order_details, correla
 } 
 
 // UC_ORDER Invoice Updation Query
-DBModule.Order_Update_Invoice = (id, invoice_number, processing_status, correlationId) =>{
+DBModule.Order_Update_Invoice = (id, invoice_number, invoice_url, s3_bucket_url, processing_status, correlationId) =>{
     let current_date = new Date().toLocaleString();
     return new Promise((resolve, reject) =>{
         // console.log(id, invoice_number, processing_status);
-        pool.query('UPDATE UC_ORDER SET invoice_number = $2, processing_status = $3, UPDATED_AT = $4 WHERE id = $1',[id, invoice_number, processing_status, current_date], (error, results) => {
+        pool.query('UPDATE UC_ORDER SET invoice_number = $2, invoice_url = $5, s3_bucket_url = $6, processing_status = $3, UPDATED_AT = $4 WHERE id = $1',[id, invoice_number, processing_status, current_date, invoice_url, s3_bucket_url], (error, results) => {
             if (error) {
                 logger.error(error," correlationId Id: ",correlationId);
                 reject(error);
@@ -151,11 +152,91 @@ DBModule.Order_Update_Payment = (invoice_number, processing_status) =>{
                 logger.error(error);
                 reject(error);
             }
-            logger.info("Updating the Payment status in UC_ORDER Table - clinical uhid: ",results.rows[0].clinical_uhid, "encounter id: ",results.rows[0].encounter_id);
+            if(results.rows[0]){
+                logger.info("Updating the Payment status in UC_ORDER Table - clinical uhid: ",results.rows[0].clinical_uhid, "encounter id: ",results.rows[0].encounter_id);
+            }else{
+                logger.info("No Record found to update Payment status in UC_ORDER Table for - invoice number: ",invoice_number);
+            }
             resolve(results.rowCount);
         }) 
     })   
 }
 
+// UC_ORDER Invoice URL search Query
+DBModule.Order_Invoice_Urls = (uuid) =>{
+    // let current_date = new Date().toLocaleString();
+    return new Promise((resolve, reject) =>{
+        pool.query('Select uc_order.encounter_id, uc_order.invoice_number, uc_order.invoice_url, uc_order.processing_status from UC_ORDER uc_order inner join Patient p on p.clinical_uhid = uc_order.clinical_uhid WHERE p.uuid = $1',[uuid], (error, results) => {
+            if (error) {
+                logger.error(error);
+                reject(error);
+            }
+            if(results.rows[0]){
+                logger.info("Found the invoice url in UC_ORDER Table for -  uuid: ",uuid, "encounter id: ",results.rows[0].encounter_id);
+            }else{
+                logger.info("No Record found to get invoice url in UC_ORDER Table for - uuid: ",uuid);
+            }
+            resolve(results.rows);
+        }) 
+    })   
+}
+
+// ORDER_TXN_LOGS insertion Query
+DBModule.Order_Txn_Logs_Insert = (order_msg_id, logs_arr) =>{
+    let current_date = new Date().toLocaleString();
+    let id = UUID();
+    return new Promise((resolve, reject) =>{
+        pool.query('INSERT INTO ORDER_TXN_LOGS (id, order_msg_id, order_logs, created_at, updated_at) VALUES ($1, $2, $3, $4, $4) RETURNING *',[id, order_msg_id, logs_arr, current_date], (error, results) => {
+            if (error) {
+                logger.error(error);
+                reject(error);
+            }
+            logger.info("Inserting zoho txn logs in ORDER_TXN_LOGS Table - order msg id: ",results.rows[0].order_msg_id);
+            resolve(results.rows[0].id);
+        }) 
+    }) 
+}
+
+// ORDER_TXN_LOGS Updation Query
+DBModule.Order_Txn_Logs_Update = (order_id, logs_arr) =>{
+    let current_date = new Date().toLocaleString();
+    return new Promise((resolve, reject) =>{
+        pool.query('UPDATE ORDER_TXN_LOGS set order_logs = (select order_logs from ORDER_TXN_LOGS where order_msg_id = $1) || $2, UPDATED_AT = $3 where order_msg_id = $1 RETURNING *',[order_id, logs_arr, current_date], (error, results) => {
+            if (error) {
+                logger.error(error);
+                reject(error);
+            }
+            if(results.rows[0]){
+                logger.info("Updating zoho txn logs in ORDER_TXN_LOGS Table - order msg id: ",results.rows[0].order_msg_id);
+            }else{
+                logger.info("No Record found to update zoho txn logs in ORDER_TXN_LOGS Table for - order id: ",order_id);
+            }
+            resolve(results.rowCount);
+        }) 
+    }) 
+}
+
+// ORDER_TXN_LOGS Webhook Updation Query
+DBModule.Order_Txn_Logs_Webhook_Update = (invoice_number, logs) =>{
+    return new Promise((resolve, reject) =>{
+        pool.query('select otl.order_msg_id, array_length(otl.order_logs,1) from order_txn_logs otl inner join uc_order uo on otl.order_msg_id = uo.id where uo.invoice_number = $1',[invoice_number], (error, results) => {
+            if (error) {
+                logger.error(error);
+                reject(error);
+            }
+            resolve(results);
+        }) 
+    }).then(async res=>{
+        if(res.rows[0]){
+            logger.info("Updating zoho txn logs in ORDER_TXN_LOGS Table for - invoice number: ",invoice_number)
+            let logs_arr = [`{${res.rows[0].array_length+1}:"${"Payment Logs : " + logs +", for invoice number =>"+ invoice_number}"}`];
+            await DBModule.Order_Txn_Logs_Update(res.rows[0].order_msg_id, logs_arr);
+        }else{
+            logger.info("No Record found to update zoho txn logs in ORDER_TXN_LOGS Table for - invoice number: ",invoice_number);
+        }
+    }).catch(err=>{
+        reject(err);
+    })
+}
 
 module.exports = DBModule;

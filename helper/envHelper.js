@@ -10,6 +10,9 @@ const envVariables = {
     CODE: get(env, 'CODE') || '1000.4e52783eb575a1cec142c89d73e127a6.e42980b9b90c0fa02e05940bba6eaf0c',
     PAYMENT_GATEWAY: get(env, 'PAYMENT_GATEWAY') || 'razorpay',
     REGION: get(env, 'REGION') || 'ap-south-1',
+    S3_BUCKET: get(env, 'S3_BUCKET') || 'urban-care-documents',
+    S3_FOLDER: get(env, 'S3_FOLDER') || 'patient-invoice',
+    DEPLOYMENT_ENV: get(env, 'DEPLOYMENT_ENV') || 'dev',
     INVOICE_QUEUE_URL: get(env, 'INVOICE_QUEUE_URL') || 'https://sqs.ap-south-1.amazonaws.com/315872761357/local-uc-invoice-generation',
     PERSON_QUEUE_URL: get(env, 'PERSON_QUEUE_URL') || 'https://sqs.ap-south-1.amazonaws.com/315872761357/local-uc-clinical-person-info',
     DB: {
