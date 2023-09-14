@@ -80,7 +80,7 @@ const zohoUserCreationOrUpdation = async(userObj, correlationId, uhid) =>{
     return axios.get(`https://www.zohoapis.in/books/v3/contacts?cf_uhid=${uhid}&organization_id=${envVariables.ORGANIZATION_ID}`,config)
             .then(res=>{
                 if(res.data.contacts.length > 0){
-                    logger.info("Step 4 successfull - Got customer id from zoho Books, won't create a new customer"," correlationId Id: ",correlationId, " patient uhid: ",uhid);
+                    logger.info("Step 2 successfull - Got customer id from zoho Books, won't create a new customer"," correlationId Id: ",correlationId, " patient uhid: ",uhid);
                     // updation condition
                     if(uhid){
                         logger.info("Updation request received, updating contact info in books..."," correlationId Id: ",correlationId, " patient uhid: ",uhid);
@@ -90,7 +90,7 @@ const zohoUserCreationOrUpdation = async(userObj, correlationId, uhid) =>{
                             return `${response.data.message} for ${response.data.contact.contact_id}`
                         }).catch(err=>{
                             logger.error("User info updation failed in zoho books, " + err.response.data.message," correlationId Id: ",correlationId, " patient uhid: ",uhid)
-                            throw new Error("create user error, " + err.response.data.message);
+                            throw new Error("update user error, " + err.response.data.message);
                         })
                     }
                     return res.data.contacts[0].contact_id;
@@ -165,8 +165,8 @@ zohoServices.invoice = async(uhid, items_list, userObj, msg_id, correlationId, e
             await db.Order_Txn_Logs_Insert(msg_id, txn_logs);
             txn_logs = [];
 
-            // Step 4 - Get user id from zoho Books or create a new user on the fly
-            logger.trace("Step 4 started - Getting user id from zoho Books or else creating a new user on the fly")
+            // Step 2 - Get user id from zoho Books or create a new user on the fly
+            logger.trace("Step 2 started - Getting user id from zoho Books or else creating a new user on the fly")
             let user_id = await zohoUserCreationOrUpdation(userObj,correlationId,uhid);
 
             let invoice_create_body = {

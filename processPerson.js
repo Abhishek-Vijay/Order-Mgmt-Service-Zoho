@@ -57,7 +57,7 @@ const processPersonMessage = async(message) =>{
 
         logger.info("patient insertion successfull ", patient_insertion_id," correlation Id: ",msg.key.correlationId);
 
-        let customer_response = await zohoUserCreation(user, msg.key.correlationId, msg.key.clinicalUhid).then((response)=>{
+        let customer_response = await zohoUserCreationOrUpdation(user, msg.key.correlationId, msg.key.clinicalUhid).then((response)=>{
             logger.info("success response",response);
             return response;
         }).catch((error)=>{
