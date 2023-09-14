@@ -1,5 +1,5 @@
 const envVariables = require('./helper/envHelper');
-const { zohoUserCreation } = require('./zohoService/zoho');
+const { zohoUserCreationOrUpdation } = require('./zohoService/zoho');
 const db = require('./db/DBModule');
 var log4js = require('log4js');
 var logger = log4js.getLogger();
@@ -49,7 +49,7 @@ const processPersonMessage = async(message) =>{
             
         }
 
-        let customer_response = await zohoUserCreation(user, msg.key.correlationId, msg.key.clinicalUhid).then((response)=>{
+        let customer_response = await zohoUserCreationOrUpdation(user, msg.key.correlationId, msg.key.clinicalUhid).then((response)=>{
             logger.info("success response",response);
             return response;
         }).catch((error)=>{

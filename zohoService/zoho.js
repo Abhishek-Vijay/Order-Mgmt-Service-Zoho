@@ -65,13 +65,26 @@ const accessToken = async(correlationId,uhid) =>{
         return config;
 }
 
-const zohoUserCreation = async(userObj, correlationId, uhid) =>{
+// to create or update an user in zoho books
+const zohoUserCreationOrUpdation = async(userObj, correlationId, uhid) =>{
     let config = await accessToken(correlationId,uhid);
     console.log(config);
     return axios.get(`https://www.zohoapis.in/books/v3/contacts?cf_uhid=${uhid}&organization_id=${envVariables.ORGANIZATION_ID}`,config)
             .then(res=>{
                 if(res.data.contacts.length > 0){
-                    logger.info("Step 4 successfull - Got customer id from zoho Books, won't create a new customer"," correlationId Id: ",correlationId, " patient uhid: ",uhid)
+                    logger.info("Step 4 successfull - Got customer id from zoho Books, won't create a new customer"," correlationId Id: ",correlationId, " patient uhid: ",uhid);
+                    // updation condition
+                    if(uhid){
+                        logger.info("Updation request received, updating contact info in books..."," correlationId Id: ",correlationId, " patient uhid: ",uhid);
+                        return axios.put(`https://www.zohoapis.in/books/v3/contacts/${res.data.contacts[0].contact_id}?organization_id=${envVariables.ORGANIZATION_ID}`,
+                        userObj, config).then(response=>{
+                            logger.info(response.data.message," correlationId Id: ",correlationId, " patient uhid: ",uhid);
+                            return `${response.data.message} for ${response.data.contact.contact_id}`
+                        }).catch(err=>{
+                            logger.error("User info updation failed in zoho books, " + err.response.data.message," correlationId Id: ",correlationId, " patient uhid: ",uhid)
+                            throw new Error("create user error, " + err.response.data.message);
+                        })
+                    }
                     return res.data.contacts[0].contact_id;
                 }
                 else{
@@ -90,6 +103,7 @@ const zohoUserCreation = async(userObj, correlationId, uhid) =>{
                 throw new Error("get user error, " + error.response.data.message);
             })
 }
+
 
 zohoServices.invoice = async(uhid, items_list, userObj, msg_id, correlationId) =>{
     try {
@@ -132,7 +146,7 @@ zohoServices.invoice = async(uhid, items_list, userObj, msg_id, correlationId) =
 
             // Step 4 - Get user id from zoho Books or create a new user on the fly
             logger.trace("Step 4 started - Getting user id from zoho Books or else creating a new user on the fly")
-            let user_id = await zohoUserCreation(userObj,correlationId,uhid);
+            let user_id = await zohoUserCreationOrUpdation(userObj,correlationId,uhid);
 
             let invoice_create_body = {
                 "customer_id": user_id,
@@ -198,4 +212,4 @@ zohoServices.invoice = async(uhid, items_list, userObj, msg_id, correlationId) =
     
 }
 
-module.exports = {zohoServices, zohoUserCreation};
+module.exports = {zohoServices, zohoUserCreationOrUpdation};
