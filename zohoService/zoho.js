@@ -74,7 +74,7 @@ const accessToken = async(correlationId,uhid) =>{
 }
 
 // to create or update an user in zoho books
-const zohoUserCreationOrUpdation = async(userObj, correlationId, uhid) =>{
+const zohoUserCreationOrUpdation = async(userObj, correlationId, uhid, taskType) =>{
     let config = await accessToken(correlationId,uhid);
     console.log(config);
     return axios.get(`https://www.zohoapis.in/books/v3/contacts?cf_uhid=${uhid}&organization_id=${envVariables.ORGANIZATION_ID}`,config)
@@ -82,10 +82,22 @@ const zohoUserCreationOrUpdation = async(userObj, correlationId, uhid) =>{
                 if(res.data.contacts.length > 0){
                     logger.info("Step 2 successfull - Got customer id from zoho Books, won't create a new customer"," correlationId Id: ",correlationId, " patient uhid: ",uhid);
                     // updation condition
-                    if(uhid){
+                    if(taskType == "UPDATE_PERSON"){
                         logger.info("Updation request received, updating contact info in books..."," correlationId Id: ",correlationId, " patient uhid: ",uhid);
+                        let updatedContact = {
+                            "contact_name": `${userObj?.firstName || res.data.contacts[0].first_name} ${userObj?.lastName || res.data.contacts[0].last_name}`,
+                            "contact_persons": [
+                                   {
+                                       "first_name": `${userObj?.firstName || res.data.contacts[0].first_name}`,
+                                       "last_name": `${userObj?.lastName || res.data.contacts[0].last_name}`,
+                                       "email": `${userObj?.emailId || res.data.contacts[0].email}`,
+                                       "is_primary_contact": true,
+                                       "enable_portal": true
+                                   }
+                               ]
+                       }
                         return axios.put(`https://www.zohoapis.in/books/v3/contacts/${res.data.contacts[0].contact_id}?organization_id=${envVariables.ORGANIZATION_ID}`,
-                        userObj, config).then(response=>{
+                        updatedContact, config).then(response=>{
                             logger.info(response.data.message," correlationId Id: ",correlationId, " patient uhid: ",uhid);
                             return `${response.data.message} for ${response.data.contact.contact_id}`
                         }).catch(err=>{
@@ -93,14 +105,15 @@ const zohoUserCreationOrUpdation = async(userObj, correlationId, uhid) =>{
                             throw new Error("update user error, " + err.response.data.message);
                         })
                     }
+                    // returning the customer id if no updation required
                     return res.data.contacts[0].contact_id;
-                }
-                else{
+                }else if(taskType == "CREATE_PERSON" || taskType == "CREATE_ORDER"){
                     logger.warn("couldn't find contact in books, creating contact..."," correlationId Id: ",correlationId, " patient uhid: ",uhid);
                     return axios.post(`https://www.zohoapis.in/books/v3/contacts?organization_id=${envVariables.ORGANIZATION_ID}`,userObj,config).then(result=>{
                         logger.info("Step 2 successfull - created a new customer on the fly"," correlationId Id: ",correlationId, " patient uhid: ",uhid);
                         return result.data.contact.contact_id;
                     }).catch(err=>{
+                        console.log(userObj);
                         logger.error("step 2 at creating user error " + err.response.data.message," correlationId Id: ",correlationId, " patient uhid: ",uhid)
                         throw new Error("create user error, " + err.response.data.message);
                     })
