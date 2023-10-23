@@ -17,7 +17,7 @@ const processPersonMessage = async(message) =>{
     logger.info("Processing for the customer with"," correlation Id: ",msg.key.correlationId, " patient uhid: ",msg.key.clinicalUhid);
 
     // Regex to check email Id format provided in the message received from SQS.
-    let regex = new RegExp(/^[^\s][a-z0-9._@]+@[a-z]+\.[a-z]{2,3}$/);
+    let regex = new RegExp(/(^[^\s][a-z0-9._@-]+@[a-z0-9-]+\.[a-z]{2,4}\.[a-z]{2}$)|(^[^\s][a-z0-9._@-]+@[a-z0-9-]+\.[a-z]{2,4}$)/);
     let user;
     if(msg.message.taskType.toUpperCase() == "CREATE_PERSON"){
         // checking all the informations are available in the SQS message or not
