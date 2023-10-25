@@ -21,7 +21,7 @@ const processPersonMessage = async(message) =>{
     let user;
     if(msg.message.taskType.toUpperCase() == "CREATE_PERSON"){
         // checking all the informations are available in the SQS message or not
-        if(msg.key && msg.message && msg.key.hasOwnProperty('messageId') && msg.key.hasOwnProperty('patientId') && msg.key.hasOwnProperty('clinicalUhid') && msg.message.hasOwnProperty('personInfo') &&msg.message.personInfo && msg.message.personInfo.firstName && regex.test(msg.message.personInfo.emailId)){
+        if(msg.key && msg.message && msg.key.hasOwnProperty('messageId') && msg.key.hasOwnProperty('patientId') && msg.key.hasOwnProperty('clinicalUhid') && msg.message.hasOwnProperty('personInfo') &&msg.message.personInfo && msg.message.personInfo.firstName && regex.test(msg.message.personInfo.emailId.trim())){
             logger.info("Creating Customer in Zoho Books....");
             let person_from_msg = msg.message.personInfo
             user = {
