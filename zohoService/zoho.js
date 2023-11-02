@@ -73,21 +73,47 @@ const accessToken = async(correlationId,uhid) =>{
         return config;
 }
 
-const zohoUserCreation = async(userObj, correlationId, uhid) =>{
+// to create or update an user in zoho books
+const zohoUserCreationOrUpdation = async(userObj, correlationId, uhid, taskType) =>{
     let config = await accessToken(correlationId,uhid);
     console.log(config);
     return axios.get(`https://www.zohoapis.in/books/v3/contacts?cf_uhid=${uhid}&organization_id=${envVariables.ORGANIZATION_ID}`,config)
             .then(res=>{
                 if(res.data.contacts.length > 0){
                     logger.info("Step 2 successfull - Got customer id from zoho Books, won't create a new customer"," correlationId Id: ",correlationId, " patient uhid: ",uhid);
+                    // updation condition
+                    if(taskType == "UPDATE_PERSON"){
+                        logger.info("Updation request received, updating contact info in books..."," correlationId Id: ",correlationId, " patient uhid: ",uhid);
+                        let updatedContact = {
+                            "contact_name": `${userObj?.firstName || res.data.contacts[0].first_name} ${userObj?.lastName || res.data.contacts[0].last_name}`,
+                            "contact_persons": [
+                                   {
+                                       "first_name": `${userObj?.firstName || res.data.contacts[0].first_name}`,
+                                       "last_name": `${userObj?.lastName || res.data.contacts[0].last_name}`,
+                                       "email": `${userObj?.emailId.trim() || res.data.contacts[0].email}`,
+                                       "is_primary_contact": true,
+                                       "enable_portal": true
+                                   }
+                               ]
+                       }
+                        return axios.put(`https://www.zohoapis.in/books/v3/contacts/${res.data.contacts[0].contact_id}?organization_id=${envVariables.ORGANIZATION_ID}`,
+                        updatedContact, config).then(response=>{
+                            logger.info(response.data.message," correlationId Id: ",correlationId, " patient uhid: ",uhid);
+                            return `${response.data.message} for ${response.data.contact.contact_id}`
+                        }).catch(err=>{
+                            logger.error("User info updation failed in zoho books, " + err.response.data.message," correlationId Id: ",correlationId, " patient uhid: ",uhid)
+                            throw new Error("update user error, " + err.response.data.message);
+                        })
+                    }
+                    // returning the customer id if no updation required
                     return res.data.contacts[0].contact_id;
-                }
-                else{
+                }else if(taskType == "CREATE_PERSON" || taskType == "CREATE_ORDER"){
                     logger.warn("couldn't find contact in books, creating contact..."," correlationId Id: ",correlationId, " patient uhid: ",uhid);
                     return axios.post(`https://www.zohoapis.in/books/v3/contacts?organization_id=${envVariables.ORGANIZATION_ID}`,userObj,config).then(result=>{
                         logger.info("Step 2 successfull - created a new customer on the fly"," correlationId Id: ",correlationId, " patient uhid: ",uhid);
                         return result.data.contact.contact_id;
                     }).catch(err=>{
+                        console.log(userObj);
                         logger.error("step 2 at creating user error " + err.response.data.message," correlationId Id: ",correlationId, " patient uhid: ",uhid)
                         throw new Error("create user error, " + err.response.data.message);
                     })
@@ -154,7 +180,7 @@ zohoServices.invoice = async(uhid, items_list, userObj, msg_id, correlationId, e
 
             // Step 2 - Get user id from zoho Books or create a new user on the fly
             logger.trace("Step 2 started - Getting user id from zoho Books or else creating a new user on the fly")
-            let user_id = await zohoUserCreation(userObj,correlationId,uhid);
+            let user_id = await zohoUserCreationOrUpdation(userObj,correlationId,uhid);
 
             let invoice_create_body = {
                 "customer_id": user_id,
@@ -194,8 +220,8 @@ zohoServices.invoice = async(uhid, items_list, userObj, msg_id, correlationId, e
                 "to_mail_ids": [
                     userObj.contact_persons[0].email
                 ],
-                "subject": `Invoice from Tata Urban Clinic (Invoice#: ${invoice_details.invoice.invoice_number})`,
-                "body": `Dear Customer,         <br><br>Thanks for your business.         <br><br>The invoice ${invoice_details.invoice.invoice_number} is attached with this email. You can choose the easy way out and <a href= ${invoice_details.invoice.invoice_url.replace("/secure","/securepay")}  >pay online for this invoice.</a>         <br><br>Here's an overview of the invoice for your reference.         <br><br>Invoice Overview:         <br>Invoice  : ${invoice_details.invoice.invoice_number}         <br>Date : ${invoice_details.invoice.date}         <br>Amount : ${invoice_details.invoice.currency_symbol} ${invoice_details.invoice.total}         <br><br>Thank you for giving us the opportunity to serve you. In case of any queries, please reach out to us at 08069156999.<br><br>\nRegards<br>\nTata Urban Clinic<br>\n`
+                "subject": `Invoice from Tata MD Healthcare (Invoice#: ${invoice_details.invoice.invoice_number})`,
+                "body": `Dear Customer,         <br><br>Thanks for your business.         <br><br>The invoice ${invoice_details.invoice.invoice_number} is attached with this email. You can choose the easy way out and <a href= ${invoice_details.invoice.invoice_url.replace("/secure","/securepay")}  >pay online for this invoice.</a>         <br><br>Here's an overview of the invoice for your reference.         <br><br>Invoice Overview:         <br>Invoice  : ${invoice_details.invoice.invoice_number}         <br>Date : ${invoice_details.invoice.date}         <br>Amount : ${invoice_details.invoice.currency_symbol} ${invoice_details.invoice.total}         <br><br>Thank you for giving us this opportunity to serve you. In case of any queries, please reach out to us at 08069156999.<br><br>\nRegards<br>\nTata MD Healthcare<br>\n`
             }
 
             logger.trace("Step 5 started- Emailing the generated invoice to the customer for further processing.....")
@@ -267,4 +293,4 @@ zohoServices.invoice = async(uhid, items_list, userObj, msg_id, correlationId, e
     
 }
 
-module.exports = {zohoServices, zohoUserCreation};
+module.exports = {zohoServices, zohoUserCreationOrUpdation};
