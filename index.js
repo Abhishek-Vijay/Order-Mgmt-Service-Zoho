@@ -89,7 +89,8 @@ app.get('/order-mgmt/patient/:uuid/payment-invoice', async(req,res)=>{
                     invoiceUrl: newobj.invoice_url,
                     processingStatus: newobj.processing_status,
                     paymentStatus: newobj.payment_status,
-                    updatedAt: newobj.updated_at.toISOString().replace("T", " ")
+                    // createdAt: newobj.created_at.toISOString().replace("T", " ")
+                    createdAt: newobj.created_at.toLocaleString().replace(",","")
                 }
             });
             res.statusCode = 200;

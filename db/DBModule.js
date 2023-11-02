@@ -166,7 +166,7 @@ DBModule.Order_Update_Payment = (invoice_number, processing_status, payment_stat
 DBModule.Order_Invoice_Urls = (uuid) =>{
     // let current_date = new Date().toLocaleString();
     return new Promise((resolve, reject) =>{
-        pool.query('Select uc_order.encounter_id, uc_order.invoice_number, uc_order.invoice_url, uc_order.processing_status, uc_order.clinical_uhid, uc_order.payment_status, uc_order.updated_at from UC_ORDER uc_order inner join Patient p on p.clinical_uhid = uc_order.clinical_uhid WHERE p.uuid = $1',[uuid], (error, results) => {
+        pool.query('Select uc_order.encounter_id, uc_order.invoice_number, uc_order.invoice_url, uc_order.processing_status, uc_order.clinical_uhid, uc_order.payment_status, uc_order.created_at from UC_ORDER uc_order inner join Patient p on p.clinical_uhid = uc_order.clinical_uhid WHERE p.uuid = $1',[uuid], (error, results) => {
             if (error) {
                 logger.error(error);
                 reject(error);
