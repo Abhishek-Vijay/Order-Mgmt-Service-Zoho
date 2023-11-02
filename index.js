@@ -78,16 +78,22 @@ app.get('/order-mgmt/patient/:uuid/payment-invoice', async(req,res)=>{
     // console.log(req.params.uuid);
     await db.Order_Invoice_Urls(req.params.uuid).then(data=>{
         if(data.length){
-            let formattedData = data.map(obj=>{
+            let formattedData = data.filter(obj=>{
+                if(obj.invoice_url){
+                    return obj
+                }
+            }).map(newobj=>{ 
                 return {
-                    encounterId: obj.encounter_id,
-                    invoiceNumber: obj.invoice_number,
-                    invoiceUrl: obj.invoice_url,
-                    processingStatus: obj.processing_status
+                    encounterId: newobj.encounter_id,
+                    invoiceNumber: newobj.invoice_number,
+                    invoiceUrl: newobj.invoice_url,
+                    processingStatus: newobj.processing_status,
+                    paymentStatus: newobj.payment_status,
+                    updatedAt: newobj.updated_at.toISOString().replace("T", " ")
                 }
             });
             res.statusCode = 200;
-            res.json(formattedData);
+            res.json({"clinicalUhid": data[0].clinical_uhid, "invoiceDetails":formattedData});
         }else{
             res.statusCode = 200;
             res.json(data);
@@ -108,16 +114,16 @@ app.post('/paymentHook', async(req, res) => {
     }
     // print request body
     if(req.body.status){
-        let status;
+        let processing_status;
         logger.info(req.body);
-        if (req.body.status.toUpperCase() == 'PAID') status = 'PAYMENT_COMPLETED';
-        else if (req.body.status.toUpperCase() == 'FAILED') status = 'PAYMENT_FAILED';
-        else if (req.body.status.toUpperCase() == 'OVERDUE') status = 'PAYMENT_OVERDUE';
-        await db.Order_Update_Payment(req.body.invoice_number, `${status}`).then(data=>data).catch(err=>{
+        if (req.body.status.toUpperCase() == 'PAID') processing_status = 'PAYMENT_COMPLETED';
+        else if (req.body.status.toUpperCase() == 'FAILED') processing_status = 'PAYMENT_FAILED';
+        else if (req.body.status.toUpperCase() == 'OVERDUE') processing_status = 'PAYMENT_OVERDUE';
+        await db.Order_Update_Payment(req.body.invoice_number, processing_status, req.body.status.toUpperCase()).then(data=>data).catch(err=>{
             logger.error(err);
             return;
         });
-        await db.Order_Txn_Logs_Webhook_Update(req.body.invoice_number, status);
+        await db.Order_Txn_Logs_Webhook_Update(req.body.invoice_number, processing_status);
     }
     // return a text response
     const data = { type: 'Received' };

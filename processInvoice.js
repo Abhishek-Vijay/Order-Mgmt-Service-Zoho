@@ -80,7 +80,7 @@ const processInvoiceMessage = async(message) => {
         
                     let invoice_response = await zohoServices.invoice(msg.key.clinicalUhid, msg.message.orderItems, user, msg.key.messageId, msg.key.correlationId, msg.key.encounterId).then(async(response)=>{
                         logger.info("success response",response);
-                        await db.Order_Update_Invoice(response.msg_id, response.invoice_no, response.invoice_url, response.s3_bucket_url, "INVOICE_CREATED", response.correlationId).then(data=>data).catch(err=>{
+                        await db.Order_Update_Invoice(response.msg_id, response.invoice_no, response.invoice_url, response.s3_bucket_url, "INVOICE_CREATED", "DUE", response.correlationId).then(data=>data).catch(err=>{
                             logger.error(err);
                             return;
                         });
@@ -88,7 +88,7 @@ const processInvoiceMessage = async(message) => {
                     }).catch(async(error)=>{
                         logger.error(error)
                         console.log("came here");
-                        await db.Order_Update_Invoice(error.message.split("<>")[1], null, null, null, "INVOICE_FAILED", error.message.split("->")[1]).then(data=>data).catch(err=>{
+                        await db.Order_Update_Invoice(error.message.split("<>")[1], null, null, null, "INVOICE_FAILED", null, error.message.split("->")[1]).then(data=>data).catch(err=>{
                             logger.error("INVOICE_FAILED ",err);
                             return;
                         });
