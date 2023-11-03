@@ -180,7 +180,7 @@ zohoServices.invoice = async(uhid, items_list, userObj, msg_id, correlationId, e
 
             // Step 2 - Get user id from zoho Books or create a new user on the fly
             logger.trace("Step 2 started - Getting user id from zoho Books or else creating a new user on the fly")
-            let user_id = await zohoUserCreationOrUpdation(userObj,correlationId,uhid);
+            let user_id = await zohoUserCreationOrUpdation(userObj,correlationId,uhid,taskType="CREATE_ORDER");
 
             let invoice_create_body = {
                 "customer_id": user_id,
