@@ -74,7 +74,7 @@ const readingSQSMsg = async() =>{
 }
 
 // API to get invoice url for mobile app to use.
-app.get('/order-mgmt/patient/:uuid/payment-invoice', async(req,res)=>{
+app.get('/order-mgmt/patient/:uuid/order-invoice', async(req,res)=>{
     // console.log(req.params.uuid);
     await db.Order_Invoice_Urls(req.params.uuid).then(data=>{
         if(data.length){
