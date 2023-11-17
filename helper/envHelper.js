@@ -9,6 +9,10 @@ const envVariables = {
     CLIENT_SECRET: get(env, 'CLIENT_SECRET') || 'c59989b20b948e43cc2dd9f96c3277e5619f281fe7',
     CODE: get(env, 'CODE') || '1000.78f5d3cc1a20323863822994d41405cb.afe4d8f617a18685253eeeb04f86c2c3',
     PAYMENT_GATEWAY: get(env, 'PAYMENT_GATEWAY') || 'razorpay',
+    BILLING_CLIENT_ID:get(env, 'BILLING_CLIENT_ID') || '1000.X84CRC9OL870OQM12BW455QY6OLCAO',
+    BILLING_CLIENT_SECRET:get(env, 'BILLING_CLIENT_SECRET') || '917b24a38df1f4f5ebaa58c133496122ae4346ad71',
+    BILLING_REFRESH_TOKEN:get(env, 'BILLING_REFRESH_TOKEN') || '1000.72abeb2bce9b500732d94e006110056c.6759989339b9ca7e5624d63f6cfd6805',
+    BILLING_ORGANIZATION_ID:get(env, 'BILLING_ORGANIZATION_ID') || '60025084079',
     REGION: get(env, 'REGION') || 'ap-south-1',
     S3_BUCKET: get(env, 'S3_BUCKET') || 'urban-care-documents',
     S3_FOLDER: get(env, 'S3_FOLDER') || 'patient-invoice',
@@ -18,8 +22,8 @@ const envVariables = {
     DB: {
         POSTGRES_USER: get(env, 'POSTGRES_USER') || 'postgres',
         POSTGRES_HOST: get(env, 'POSTGRES_HOST') || 'localhost',
-        POSTGRES_DATABASE: get(env, 'POSTGRES_DATABASE') || 'postgres',
-        POSTGRES_PASSWORD: get(env, 'POSTGRES_PASSWORD') || 'postgres',
+        POSTGRES_DATABASE: get(env, 'POSTGRES_DATABASE') || 'zohoBooks',
+        POSTGRES_PASSWORD: get(env, 'POSTGRES_PASSWORD') || 'root',
         POSTGRES_PORT: get(env, 'POSTGRES_PORT') || 5432
     },
     // changed the scope to "ZohoBooks.invoices.CREATE ZohoBooks.invoices.READ ZohoBooks.invoices.UPDATE ZohoBooks.invoices.DELETE ZohoBooks.contacts.CREATE ZohoBooks.contacts.UPDATE ZohoBooks.contacts.READ ZohoBooks.contacts.DELETE ZohoBooks.settings.READ"

@@ -98,6 +98,19 @@ DBModule.Patient_Update = (clinical_uhid, correlationId) =>{
     })
 }
 
+DBModule.update_subscription_details = (subscriptionId, clinical_uhid, payment_status,subscription_status,planCode) =>{
+    let updated_date = new Date();
+    return new Promise((resolve, reject) =>{
+        pool.query('UPDATE UC_SUBSCRIPTION SET subscription_id = $1,subscription_status = $2,payment_status = $3,updated_at = $4 WHERE clinical_uhid = $5 and billing_plan_code = $6', [subscriptionId, subscription_status,payment_status,updated_date,clinical_uhid,planCode], (error, results) => {
+            if (error) {
+                logger.error('Error while updating the subscription details',error);
+                reject(error);
+            }
+            logger.info("Updating the row in subscription Table ",results.rows);
+        })
+    })
+}
+
 // UC_ORDER Insertion Query
 DBModule.Order_Insert = (id, encounter_id, clinical_uhid, order_details, correlationId) =>{
     return new Promise((resolve, reject) =>{
@@ -181,6 +194,41 @@ DBModule.Order_Invoice_Urls = (uuid) =>{
     })   
 }
 
+DBModule.get_customer_id = (uuid) =>{
+    return new Promise((resolve, reject) =>{
+        pool.query('Select customer_id,clinical_uhid from PATIENT p WHERE p.uuid = $1',[uuid], (error, results) => {
+            if (error) {
+                logger.error(error);
+                reject(error);
+            }
+            if(results.rows[0]){
+                logger.info("Found the customerId in PATIENT table with uuid: ",uuid, "customerId: ",results.rows[0].customer_id);
+            }else{
+                logger.info("No Record found to get customerId in PATIENT table with uuid: ",uuid);
+            }
+            resolve(results.rows[0]);
+        })
+    })
+}
+
+
+DBModule.get_clinical_uhid = (customerId) =>{
+    return new Promise((resolve, reject) =>{
+        pool.query('Select clinical_uhid from PATIENT p WHERE p.customer_id = $1',[customerId], (error, results) => {
+            if (error) {
+                logger.error(error);
+                reject(error);
+            }
+            if(results.rows[0]){
+                logger.info("Found the customerId in PATIENT table with customerId: ",customerId, "customerId: ",results.rows[0].clinical_uhid);
+            }else{
+                logger.info("No Record found to get customerId in PATIENT table with customerId: ",customerId);
+            }
+            resolve(results.rows[0].clinical_uhid);
+        })
+    })
+}
+
 // ORDER_TXN_LOGS insertion Query
 DBModule.Order_Txn_Logs_Insert = (order_msg_id, logs_arr) =>{
     let current_date = new Date();
@@ -193,8 +241,25 @@ DBModule.Order_Txn_Logs_Insert = (order_msg_id, logs_arr) =>{
             }
             logger.info("Inserting zoho txn logs in ORDER_TXN_LOGS Table - order msg id: ",results.rows[0].order_msg_id);
             resolve(results.rows[0].id);
-        }) 
-    }) 
+        })
+    })
+}
+
+DBModule.create_subscription_logs = (clinical_uhid, billing_plan_code) =>{
+    let created_at = new Date();
+    let id = UUID();
+    let subscription_status = 'REQUESTED';
+    let payment_status = 'NIL'
+    return new Promise((resolve, reject) =>{
+        pool.query('INSERT INTO UC_SUBSCRIPTION (id, clinical_uhid, billing_plan_code, subscription_status,payment_status,created_at,updated_at) VALUES ($1, $2, $3, $4, $5, $6,$6) RETURNING *',[id, clinical_uhid, billing_plan_code,subscription_status,payment_status,created_at], (error, results) => {
+            if (error) {
+                logger.error(error);
+                reject(error);
+            }
+            logger.info("Inserting subscription details in subscription Table - id: ",results.rows[0].id);
+            resolve(results.rows[0].id);
+        })
+    })
 }
 
 // ORDER_TXN_LOGS Updation Query

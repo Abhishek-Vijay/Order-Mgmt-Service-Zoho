@@ -1,6 +1,6 @@
 const envVariables = require('../helper/envHelper');
 const axios = require('axios');
-const get_access_token = require('./access_token_Module');
+const tokens = require('./access_token_Module');
 
 // S3 related imports
 const { S3Client, PutObjectCommand} = require("@aws-sdk/client-s3");
@@ -55,11 +55,11 @@ const accessToken = async(correlationId,uhid) =>{
             if(token_timer && ((Date.now()) - token_timer < (token.expires_in-300)*1000)){
                 logger.info("token without any API call ",token.access_token," correlationId Id: ",correlationId, " patient uhid: ",uhid);
             }else{
-                token = await get_access_token(uhid, correlationId);
+                token = await tokens.get_access_token();
                 logger.info("token after API call because expired ",token.access_token," correlationId Id: ",correlationId, " patient uhid: ",uhid);
             }
         }else{
-            token = await get_access_token(uhid, correlationId);
+            token = await tokens.get_access_token();
             logger.info("token after API call ",token.access_token," correlationId Id: ",correlationId, " patient uhid: ",uhid);
         }
 
