@@ -252,7 +252,6 @@ const headers = {
   }
 });
 
-
 // Payment webhook for payment notification.
 app.post('/paymentHook', async(req, res) => {
     // check if verification token is correct
@@ -285,7 +284,7 @@ app.post('/subscriptionHook', async(req, res) => {
   let planCode = req.body.planCode;
   let clinical_uhid = await db.get_clinical_uhid(customerId);
   let paymentStatus = 'PAID';
-  let subscriptionStatus = 'NOT_SUBSCRIBED';
+  let subscriptionStatus = 'SUBSCRIBED';
   await db.update_subscription_details(subscriptionId, clinical_uhid,paymentStatus,subscriptionStatus,planCode);
   const data = { type: 'Subscribed successfully' };
       res.json(data);
