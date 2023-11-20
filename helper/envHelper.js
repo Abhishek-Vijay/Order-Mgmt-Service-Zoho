@@ -22,8 +22,8 @@ const envVariables = {
     DB: {
         POSTGRES_USER: get(env, 'POSTGRES_USER') || 'postgres',
         POSTGRES_HOST: get(env, 'POSTGRES_HOST') || 'localhost',
-        POSTGRES_DATABASE: get(env, 'POSTGRES_DATABASE') || 'zohoBooks',
-        POSTGRES_PASSWORD: get(env, 'POSTGRES_PASSWORD') || 'root',
+        POSTGRES_DATABASE: get(env, 'POSTGRES_DATABASE') || 'postgres',
+        POSTGRES_PASSWORD: get(env, 'POSTGRES_PASSWORD') || 'postgres',
         POSTGRES_PORT: get(env, 'POSTGRES_PORT') || 5432
     },
     // changed the scope to "ZohoBooks.invoices.CREATE ZohoBooks.invoices.READ ZohoBooks.invoices.UPDATE ZohoBooks.invoices.DELETE ZohoBooks.contacts.CREATE ZohoBooks.contacts.UPDATE ZohoBooks.contacts.READ ZohoBooks.contacts.DELETE ZohoBooks.settings.READ"
