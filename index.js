@@ -217,10 +217,13 @@ app.post('/order-mgmt/patient/:patientId/subscription', async (req, res) => {
     logger.error('patientId cannot be empty or null');
      return res.sendStatus(400);
  }
+
+ // TO-DO call the zoho API to fetch customer ID
  let patientDetails = await db.get_customer_id(req.params.patientId).then(data=>data).catch(err=>{
               logger.error('Error while retrieving customerId from patient table.',err);
                return res.sendStatus(500);
           });
+
  let subscriptionCode = req.body.subscriptionCode;
  let newSubscription = {
               "customer_id": `${patientDetails.customer_id}`,
