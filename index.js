@@ -130,7 +130,8 @@ let token = await tokens.get_billing_access_token();
           const jsonObject = {
             name: item.name,
             code: item.plan_code,
-            description: item.description
+            description: item.description,
+            price:item.price_brackets[0].price
           };
           // Push the generated JSON object into the array
           planInfo.push(jsonObject);
