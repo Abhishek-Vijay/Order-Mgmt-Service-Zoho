@@ -85,15 +85,15 @@ DBModule.Patient_Insert = (clinical_uhid, uuid, correlationId) =>{
 }
 
 // Patient Meta-Data Updation Query
-DBModule.Patient_Update = (clinical_uhid, correlationId) =>{
+DBModule.Patient_Update = (clinical_uhid, zoho_contact_id, correlationId) =>{
     let current_date = new Date();
     return new Promise((resolve, reject) =>{
-        pool.query('UPDATE PATIENT SET UPDATED_AT = $2 WHERE id = $1', [clinical_uhid, current_date], (error, results) => {
+        pool.query('UPDATE PATIENT SET ZOHO_CONTACT_ID = $2, UPDATED_AT = $3 WHERE clinical_uhid = $1', [clinical_uhid, zoho_contact_id, current_date], (error, results) => {
             if (error) {
                 logger.error(error," correlationId Id: ",correlationId);
                 reject(error);
             }
-            logger.info("Updating the row in PATIENT Table ",results.rows," correlationId Id: ",correlationId);
+            logger.info("Updating the row in PATIENT Table ",results.rowCount," correlationId Id: ",correlationId);
         })
     })
 }
@@ -196,13 +196,13 @@ DBModule.Order_Invoice_Urls = (uuid) =>{
 
 DBModule.get_customer_id = (uuid) =>{
     return new Promise((resolve, reject) =>{
-        pool.query('Select customer_id,clinical_uhid from PATIENT p WHERE p.uuid = $1',[uuid], (error, results) => {
+        pool.query('Select clinical_uhid from PATIENT p WHERE p.uuid = $1',[uuid], (error, results) => {
             if (error) {
                 logger.error(error);
                 reject(error);
             }
             if(results.rows[0]){
-                logger.info("Found the customerId in PATIENT table with uuid: ",uuid, "customerId: ",results.rows[0].customer_id);
+                logger.info("Found the customerId in PATIENT table with uuid: ",uuid);
             }else{
                 logger.info("No Record found to get customerId in PATIENT table with uuid: ",uuid);
             }

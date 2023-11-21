@@ -10,7 +10,7 @@ var logger = log4js.getLogger();
 logger.level = "debug";
 
 // Import required AWS SDK clients and commands for Node.js
-const { SQSClient, ReceiveMessageCommand } = require("@aws-sdk/client-sqs");
+const { SQSClient, ReceiveMessageCommand, SendMessageCommand } = require("@aws-sdk/client-sqs");
 // Create SQS service object.
 const sqsClient = new SQSClient({region: envVariables.REGION});
 
@@ -218,24 +218,31 @@ app.post('/order-mgmt/patient/:patientId/subscription', async (req, res) => {
      return res.sendStatus(400);
  }
 
- // TO-DO call the zoho API to fetch customer ID
- let patientDetails = await db.get_customer_id(req.params.patientId).then(data=>data).catch(err=>{
-              logger.error('Error while retrieving customerId from patient table.',err);
-               return res.sendStatus(500);
-          });
-
- let subscriptionCode = req.body.subscriptionCode;
- let newSubscription = {
-              "customer_id": `${patientDetails.customer_id}`,
-              "plan": {
-                   "plan_code": `${subscriptionCode}`,
-                   }
-              }
+// TO-DO call the zoho API to fetch customer ID (Edit: API call is done. Need to use previous code later.)
+logger.info("fetching customer details from Zoho Billings .......")
+let patientDetails = await db.get_customer_id(req.params.patientId).then(data=>data).catch(err=>{
+            logger.error('Error while retrieving customerId from patient table.',err);
+            return res.sendStatus(500);
+        });
+// console.log(patientDetails);
 const headers = {
- Authorization: `Zoho-oauthtoken ${token}`,
- 'X-com-zoho-subscriptions-organizationid' : `${envVariables.BILLING_ORGANIZATION_ID}`
-};
-  try {
+    Authorization: `Zoho-oauthtoken ${token}`,
+    'X-com-zoho-subscriptions-organizationid' : `${envVariables.BILLING_ORGANIZATION_ID}`
+    };
+
+try {
+    const customerDetails = await axios.get(`https://www.zohoapis.in/subscriptions/v1/customers?cf_uhid=${patientDetails.clinical_uhid}`, {headers: headers})
+    let customerDetailsResponse = JSON.parse(JSON.stringify(customerDetails.data));
+    // res.json(customerId);
+
+    let subscriptionCode = req.body.subscriptionCode;
+    let newSubscription = {
+                "customer_id": `${customerDetailsResponse.customers[0].customer_id}`,
+                "plan": {
+                    "plan_code": `${subscriptionCode}`,
+                    }
+                }
+
     const response = await axios.post('https://billing.zoho.in/api/v1/hostedpages/newsubscription',newSubscription,{
       headers: headers
     });
@@ -285,10 +292,30 @@ app.post('/subscriptionHook', async(req, res) => {
   let subscriptionId = req.body.subscriptionId;
   let customerId = req.body.customerId;
   let planCode = req.body.planCode;
-  let clinical_uhid = await db.get_clinical_uhid(customerId);
+//   let clinical_uhid = await db.get_clinical_uhid(customerId);
+  let clinical_uhid = req.body.customerUHID;
   let paymentStatus = 'PAID';
   let subscriptionStatus = 'SUBSCRIBED';
   await db.update_subscription_details(subscriptionId, clinical_uhid,paymentStatus,subscriptionStatus,planCode);
+
+// // Notification queue
+// const notificationInput = { // SendMessageRequestInput
+//     QueueUrl: envVariables.NOTIFICATION_QUEUE_URL, // required
+//     MessageBody: JSON.stringify(req.body), // required
+//     DelaySeconds: 0,
+//     MaxNumberOfMessages: 1
+//   };
+
+// try {
+//     let command = new SendMessageCommand(notificationInput)
+//     const data = await sqsClient.send(command);
+//     if (data.MessageId) {
+//         logger.info("Notification message is successfully pushed with MessageId", data.MessageId)
+//     }
+// } catch (err) {
+//     logger.error("Send Error", err);
+// }
+
   const data = { type: 'Subscribed successfully' };
       res.json(data);
 });

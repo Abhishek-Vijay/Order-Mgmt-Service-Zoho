@@ -59,9 +59,9 @@ const get_access_token = async() =>{
 }
 
 const get_billing_access_token = async() =>{
-   let refresh_token = envVariables.BILLING_REFRESH_TOKEN;
+   let refresh_token = envVariables.REFRESH_TOKEN;
     if(refresh_token){
-        token = await axios.post(`https://accounts.zoho.in/oauth/v2/token?refresh_token=${refresh_token}&client_id=${envVariables.BILLING_CLIENT_ID}&client_secret=${envVariables.BILLING_CLIENT_SECRET}&redirect_uri=https://uc-portal.tatamd.com/&grant_type=refresh_token`)
+        token = await axios.post(`https://accounts.zoho.in/oauth/v2/token?refresh_token=${refresh_token}&client_id=${envVariables.CLIENT_ID}&client_secret=${envVariables.CLIENT_SECRET}&redirect_uri=https://uc-portal.tatamd.com/&grant_type=refresh_token`)
         .then(resp=>{
             if (resp.data.access_token) {
              return resp.data.access_token;}

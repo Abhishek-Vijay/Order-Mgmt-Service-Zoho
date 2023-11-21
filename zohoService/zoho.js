@@ -109,8 +109,10 @@ const zohoUserCreationOrUpdation = async(userObj, correlationId, uhid, taskType)
                     return res.data.contacts[0].contact_id;
                 }else if(taskType == "CREATE_PERSON" || taskType == "CREATE_ORDER"){
                     logger.warn("couldn't find contact in books, creating contact..."," correlationId Id: ",correlationId, " patient uhid: ",uhid);
-                    return axios.post(`https://www.zohoapis.in/books/v3/contacts?organization_id=${envVariables.ORGANIZATION_ID}`,userObj,config).then(result=>{
+                    return axios.post(`https://www.zohoapis.in/books/v3/contacts?organization_id=${envVariables.ORGANIZATION_ID}`,userObj,config).then(async result=>{
                         logger.info("Step 2 successfull - created a new customer on the fly"," correlationId Id: ",correlationId, " patient uhid: ",uhid);
+                        // Updating customer_id from zoho in patient table 
+                        // await db.Patient_Update(uhid, result.data.contact.contact_id, correlationId);
                         return result.data.contact.contact_id;
                     }).catch(err=>{
                         console.log(userObj);
