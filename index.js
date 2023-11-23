@@ -147,6 +147,50 @@ let token = await tokens.get_billing_access_token();
   }
 });
 
+//API to list specific plan for given plancode
+app.get('/order-mgmt/subscription/:planCode', async (req, res) => {
+let token = await tokens.get_billing_access_token();
+const planCode = req.params.planCode;
+ const correlationId = req.get('X-Correlation-ID');
+ if(correlationId == null || correlationId.length == 0){
+    logger.error('Correlation ID cannot be empty');
+     return res.sendStatus(400);
+     }
+  try {
+    const response = await axios.get(`https://www.zohoapis.in/subscriptions/v1/plans/${planCode}`, {
+      headers: {
+         Authorization: `Zoho-oauthtoken ${token}`,
+        'X-com-zoho-subscriptions-organizationid' : `${envVariables.BILLING_ORGANIZATION_ID}`
+      }
+    });
+        const planInfo = [];
+        const customField = [];
+        let responseData = JSON.parse(JSON.stringify(response.data));
+        let item = responseData.plan;
+        item.custom_fields.forEach((fieldInfo) => {
+        let fieldTrimName = fieldInfo.placeholder.trim();
+        let fieldName = fieldTrimName.substring(3,fieldTrimName.length)
+            const customFieldObject = {
+             name: fieldName,
+             value: fieldInfo.value
+            };
+            customField.push(customFieldObject);
+        });
+          const jsonObject = {
+            name: item.name,
+            code: item.plan_code,
+            description: item.description,
+            price:item.price_brackets[0].price,
+            customFields: customField
+          };
+    res.statusCode = 200;
+    res.json(jsonObject);
+  } catch (error) {
+    console.error('Error while retrieving the plan:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
 
 //API to retrieve the subscriptions of a patient
 app.get('/order-mgmt/patient/:patientId/subscription', async (req, res) => {
