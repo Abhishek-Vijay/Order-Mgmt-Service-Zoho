@@ -33,6 +33,7 @@ const personParams = {
 };
 
 const db = require('./db/DBModule');
+const { UUIDGenerator } = require('./helper/generator');
 
 const app = express() // creates http server
 const processInvoiceMessage = require('./processInvoice');
@@ -218,6 +219,7 @@ app.post('/order-mgmt/patient/:patientId/subscription', async (req, res) => {
      return res.sendStatus(400);
  }
 
+try {
 // TO-DO call the zoho API to fetch customer ID (Edit: API call is done. Need to use previous code later.)
 logger.info("fetching customer details from Zoho Billings .......")
 let patientDetails = await db.get_customer_id(req.params.patientId).then(data=>data).catch(err=>{
@@ -225,17 +227,19 @@ let patientDetails = await db.get_customer_id(req.params.patientId).then(data=>d
             return res.sendStatus(500);
         });
 // console.log(patientDetails);
+
+let subscriptionCode = req.body.subscriptionCode;
+
+await db.create_subscription_logs(patientDetails.clinical_uhid, subscriptionCode);
 const headers = {
     Authorization: `Zoho-oauthtoken ${token}`,
     'X-com-zoho-subscriptions-organizationid' : `${envVariables.BILLING_ORGANIZATION_ID}`
     };
 
-try {
     const customerDetails = await axios.get(`https://www.zohoapis.in/subscriptions/v1/customers?cf_uhid=${patientDetails.clinical_uhid}`, {headers: headers})
     let customerDetailsResponse = JSON.parse(JSON.stringify(customerDetails.data));
     // res.json(customerId);
-
-    let subscriptionCode = req.body.subscriptionCode;
+    
     let newSubscription = {
                 "customer_id": `${customerDetailsResponse.customers[0].customer_id}`,
                 "plan": {
@@ -246,7 +250,6 @@ try {
     const response = await axios.post('https://billing.zoho.in/api/v1/hostedpages/newsubscription',newSubscription,{
       headers: headers
     });
-    await db.create_subscription_logs(patientDetails.clinical_uhid, subscriptionCode);
     let responseData = JSON.parse(JSON.stringify(response.data))
     let expiryTime = responseData.hostedpage.expiring_time.replace("T", " ");
     let subscriptionResponse = {
@@ -287,37 +290,72 @@ app.post('/paymentHook', async(req, res) => {
 });
 
 app.post('/subscriptionHook', async(req, res) => {
- console.log('Request received to update subscription details');
-  console.log(req.body);
+ logger.trace('Request received to update subscription details');
+  logger.info("Received information in request body",req.body);
   let subscriptionId = req.body.subscriptionId;
   let customerId = req.body.customerId;
   let planCode = req.body.planCode;
-//   let clinical_uhid = await db.get_clinical_uhid(customerId);
-  let clinical_uhid = req.body.customerUHID;
+//   let customerUHID = await db.get_clinical_uhid(customerId);
+  let customerUHID = req.body.customerUHID;
   let paymentStatus = 'PAID';
   let subscriptionStatus = 'SUBSCRIBED';
-  await db.update_subscription_details(subscriptionId, clinical_uhid,paymentStatus,subscriptionStatus,planCode);
+  let customerName = req.body.customerName;
+  await db.update_subscription_details(subscriptionId, customerUHID,paymentStatus,subscriptionStatus,planCode);
 
-// // Notification queue
-// const notificationInput = { // SendMessageRequestInput
-//     QueueUrl: envVariables.NOTIFICATION_QUEUE_URL, // required
-//     MessageBody: JSON.stringify(req.body), // required
-//     DelaySeconds: 0,
-//     MaxNumberOfMessages: 1
-//   };
+  let messageId = UUIDGenerator();
+  let correlationId = UUIDGenerator();
+  logger.info("new correlationId is:",correlationId)
+  let patientId = await db.get_patient_uuid(customerUHID);
+  let token = await tokens.get_billing_access_token();
+  let planName = await axios.get(`https://www.zohoapis.in/subscriptions/v1/plans/${planCode}`, {
+    headers: {
+       Authorization: `Zoho-oauthtoken ${token}`,
+      'X-com-zoho-subscriptions-organizationid' : `${envVariables.BILLING_ORGANIZATION_ID}`
+    }
+  }).then(res=>{
+    return res.data.plan.name;
+  }).catch(err=>{
+    logger("plan Details retreival Error", err)
+  }); 
 
-// try {
-//     let command = new SendMessageCommand(notificationInput)
-//     const data = await sqsClient.send(command);
-//     if (data.MessageId) {
-//         logger.info("Notification message is successfully pushed with MessageId", data.MessageId)
-//     }
-// } catch (err) {
-//     logger.error("Send Error", err);
-// }
+  const notificationBody = {
+            key: {
+                messageId: messageId,
+                clinicalUhid: customerUHID,
+                patientId: patientId,
+                correlationId: correlationId
+            },
+            message: {
+                type: "MOBILE_PUSH",
+                content: {
+                    title: "Care subscription enrollment status",
+                    body: `Dear ${customerName}, You have successfully subscribed with ${planName}`,
+                    type: "CARE_SUBSCRIPTION" 
+                }
+            }
+  }
+  logger.info("Notification Body to be send in SQS",notificationBody);
+
+// Notification queue
+const notificationInput = { // SendMessageRequestInput
+    QueueUrl: envVariables.NOTIFICATION_QUEUE_URL, // required
+    MessageBody: JSON.stringify(notificationBody), // required
+    DelaySeconds: 0,
+    MaxNumberOfMessages: 1
+  };
+
+try {
+    let command = new SendMessageCommand(notificationInput)
+    const data = await sqsClient.send(command);
+    if (data.MessageId) {
+        logger.info("Notification message is successfully pushed with MessageId", data.MessageId)
+    }
+} catch (err) {
+    logger.error("Send Error", err);
+}
 
   const data = { type: 'Subscribed successfully' };
-      res.json(data);
+      res.send(data);
 });
 
 //app.post('/paymentFailure', async(req, res) => {

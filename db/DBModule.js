@@ -14,17 +14,10 @@ const pool = new Pool({
     port: envVariables.DB.POSTGRES_PORT,
 })
 
-// uuid import 
-const { v4: uuidv4 } = require('uuid');
+const { UUIDGenerator } = require('../helper/generator');
 
 let DBModule = {};
 
-const UUID = () =>{
-    // uuid generation 
-    let new_uuid = uuidv4();
-    logger.info('Your UUID is: ' + new_uuid);
-    return new_uuid;
-}
 
 // Patient get ALL Query
 DBModule.Patient_getAll = () =>{
@@ -66,7 +59,7 @@ DBModule.Patient_Insert = (clinical_uhid, uuid, correlationId) =>{
             }else{
                 if(res.rows.length == 0){
                     let current_date = new Date();
-                    // let id = UUID();
+                    // let id = UUIDGenerator();
                     pool.query('INSERT INTO PATIENT (clinical_uhid, uuid, created_at, updated_at) VALUES ($1, $2, $3, $3) RETURNING *', [clinical_uhid, uuid, current_date], (error, results) => {
                         if (error) {
                             logger.error(error," correlationId Id: ",correlationId);
@@ -94,6 +87,7 @@ DBModule.Patient_Update = (clinical_uhid, zoho_contact_id, correlationId) =>{
                 reject(error);
             }
             logger.info("Updating the row in PATIENT Table ",results.rowCount," correlationId Id: ",correlationId);
+            resolve(results.rowCount);
         })
     })
 }
@@ -106,7 +100,8 @@ DBModule.update_subscription_details = (subscriptionId, clinical_uhid, payment_s
                 logger.error('Error while updating the subscription details',error);
                 reject(error);
             }
-            logger.info("Updating the row in subscription Table ",results.rows);
+            logger.info("Updating the row in subscription Table ",results.rowCount);
+            resolve(results.rowCount);
         })
     })
 }
@@ -211,6 +206,22 @@ DBModule.get_customer_id = (uuid) =>{
     })
 }
 
+DBModule.get_patient_uuid = (clinical_uhid) =>{
+    return new Promise((resolve, reject) =>{
+        pool.query('Select uuid from PATIENT p WHERE p.clinical_uhid = $1',[clinical_uhid], (error, results) => {
+            if (error) {
+                logger.error(error);
+                reject(error);
+            }
+            if(results.rows[0]){
+                logger.info("Found the uuid in PATIENT table with clinical_uhid: ",clinical_uhid);
+            }else{
+                logger.info("No Record found to get uuid in PATIENT table with clinical_uhid: ",clinical_uhid);
+            }
+            resolve(results.rows[0].uuid);
+        })
+    })
+}
 
 DBModule.get_clinical_uhid = (customerId) =>{
     return new Promise((resolve, reject) =>{
@@ -232,7 +243,7 @@ DBModule.get_clinical_uhid = (customerId) =>{
 // ORDER_TXN_LOGS insertion Query
 DBModule.Order_Txn_Logs_Insert = (order_msg_id, logs_arr) =>{
     let current_date = new Date();
-    let id = UUID();
+    let id = UUIDGenerator();
     return new Promise((resolve, reject) =>{
         pool.query('INSERT INTO ORDER_TXN_LOGS (id, order_msg_id, order_logs, created_at, updated_at) VALUES ($1, $2, $3, $4, $4) RETURNING *',[id, order_msg_id, logs_arr, current_date], (error, results) => {
             if (error) {
@@ -246,18 +257,30 @@ DBModule.Order_Txn_Logs_Insert = (order_msg_id, logs_arr) =>{
 }
 
 DBModule.create_subscription_logs = (clinical_uhid, billing_plan_code) =>{
-    let created_at = new Date();
-    let id = UUID();
-    let subscription_status = 'REQUESTED';
-    let payment_status = 'NIL'
     return new Promise((resolve, reject) =>{
-        pool.query('INSERT INTO UC_SUBSCRIPTION (id, clinical_uhid, billing_plan_code, subscription_status,payment_status,created_at,updated_at) VALUES ($1, $2, $3, $4, $5, $6,$6) RETURNING *',[id, clinical_uhid, billing_plan_code,subscription_status,payment_status,created_at], (error, results) => {
+        pool.query('select * from UC_SUBSCRIPTION where clinical_uhid = $1 and billing_plan_code = $2', [clinical_uhid, billing_plan_code] ,(error,res) => {
             if (error) {
                 logger.error(error);
                 reject(error);
+            }else{
+                if(res.rows.length == 0){
+                    let created_at = new Date();
+                    let id = UUIDGenerator();
+                    let subscription_status = 'REQUESTED';
+                    let payment_status = 'NIL'
+                    pool.query('INSERT INTO UC_SUBSCRIPTION (id, clinical_uhid, billing_plan_code, subscription_status,payment_status,created_at,updated_at) VALUES ($1, $2, $3, $4, $5, $6,$6) RETURNING *',[id, clinical_uhid, billing_plan_code,subscription_status,payment_status,created_at], (error, results) => {
+                        if (error) {
+                            logger.error(error);
+                            reject(error);
+                        }
+                        logger.info("Inserting subscription details in subscription Table - id: ",results.rows[0].id);
+                        resolve(results.rows[0].id);
+                    })
+                }else{
+                    logger.warn("The record is already present in UC_SUBSCRIPTION Table "+res.rows[0].billing_plan_code);
+                    resolve(res.rows[0]);
+                }
             }
-            logger.info("Inserting subscription details in subscription Table - id: ",results.rows[0].id);
-            resolve(results.rows[0].id);
         })
     })
 }
