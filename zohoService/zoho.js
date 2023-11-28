@@ -90,7 +90,7 @@ const zohoUserCreationOrUpdation = async(userObj, correlationId, uhid, taskType)
                                    {
                                        "first_name": `${userObj?.firstName || res.data.contacts[0].first_name}`,
                                        "last_name": `${userObj?.lastName || res.data.contacts[0].last_name}`,
-                                       "email": `${userObj?.emailId.trim() || res.data.contacts[0].email}`,
+                                       "email": `${userObj?.emailId?.trim() || res.data.contacts[0].email}`,
                                        "is_primary_contact": true,
                                        "enable_portal": true
                                    }
