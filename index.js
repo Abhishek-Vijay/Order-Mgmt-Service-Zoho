@@ -131,6 +131,7 @@ let token = await tokens.get_billing_access_token();
           const jsonObject = {
             name: item.name,
             code: item.plan_code,
+            duration: `${item.interval} ${item.interval_unit}`,
             description: item.description,
             price:item.price_brackets[0].price
           };
@@ -177,11 +178,16 @@ const planCode = req.params.planCode;
             };
             customField.push(customFieldObject);
         });
+
+        // adding plan details in SUBSCRIPTION_PLANS
+        await db.Insert_plan_table(item.plan_code, item.name);
+
           const jsonObject = {
             name: item.name,
             code: item.plan_code,
             description: item.description,
             price:item.price_brackets[0].price,
+            duration: `${item.interval} ${item.interval_unit}`,
             customFields: customField
           };
     res.statusCode = 200;
@@ -274,35 +280,45 @@ let patientDetails = await db.get_customer_id(req.params.patientId).then(data=>d
 
 let subscriptionCode = req.body.subscriptionCode;
 
-await db.create_subscription_logs(patientDetails.clinical_uhid, subscriptionCode);
-const headers = {
-    Authorization: `Zoho-oauthtoken ${token}`,
-    'X-com-zoho-subscriptions-organizationid' : `${envVariables.BILLING_ORGANIZATION_ID}`
-    };
+let subscription_logs = await db.create_subscription_logs(patientDetails.clinical_uhid, subscriptionCode).then(res=>{
+    return res;
+  }).catch(err=>{
+    logger("plan name retreival Error", err)
+  });
+if(subscription_logs.subscription_status == 'SUBSCRIBED' && subscription_logs.payment_status == 'PAID'){
+    res.status(409).json({ error: 'This plan is already subscribed' });
+}else if(subscription_logs.subscription_status == 'REQUESTED' && subscription_logs.payment_status == 'NIL'){
+    let count = subscription_logs.requested_count + 1;
+    await db.update_subscription_requestCount(count, subscription_logs.clinical_uhid, subscription_logs.billing_plan_code);
+    const headers = {
+        Authorization: `Zoho-oauthtoken ${token}`,
+        'X-com-zoho-subscriptions-organizationid' : `${envVariables.BILLING_ORGANIZATION_ID}`
+        };
 
-    const customerDetails = await axios.get(`https://www.zohoapis.in/subscriptions/v1/customers?cf_uhid=${patientDetails.clinical_uhid}`, {headers: headers})
-    let customerDetailsResponse = JSON.parse(JSON.stringify(customerDetails.data));
-    // res.json(customerId);
-    
-    let newSubscription = {
-                "customer_id": `${customerDetailsResponse.customers[0].customer_id}`,
-                "plan": {
-                    "plan_code": `${subscriptionCode}`,
+        const customerDetails = await axios.get(`https://www.zohoapis.in/subscriptions/v1/customers?cf_uhid=${patientDetails.clinical_uhid}`, {headers: headers})
+        let customerDetailsResponse = JSON.parse(JSON.stringify(customerDetails.data));
+        // res.json(customerId);
+        
+        let newSubscription = {
+                    "customer_id": `${customerDetailsResponse.customers[0].customer_id}`,
+                    "plan": {
+                        "plan_code": `${subscriptionCode}`,
+                        }
                     }
-                }
 
-    const response = await axios.post('https://billing.zoho.in/api/v1/hostedpages/newsubscription',newSubscription,{
-      headers: headers
-    });
-    let responseData = JSON.parse(JSON.stringify(response.data))
-    let expiryTime = responseData.hostedpage.expiring_time.replace("T", " ");
-    let subscriptionResponse = {
-    'subscriptionStatus' : 'REQUESTED',
-    'billingUrl' : `${responseData.hostedpage.url}` ,
-    'urlExpiryTime' : `${expiryTime}`
+        const response = await axios.post('https://billing.zoho.in/api/v1/hostedpages/newsubscription',newSubscription,{
+        headers: headers
+        });
+        let responseData = JSON.parse(JSON.stringify(response.data))
+        let expiryTime = responseData.hostedpage.expiring_time.replace("T", " ");
+        let subscriptionResponse = {
+        'subscriptionStatus' : 'REQUESTED',
+        'billingUrl' : `${responseData.hostedpage.url}` ,
+        'urlExpiryTime' : `${expiryTime}`
+        }
+        res.statusCode = 200;
+        res.json(subscriptionResponse);
     }
-    res.statusCode = 200;
-    res.json(subscriptionResponse);
   } catch (error) {
     console.error('Error while creating the subscription for a patient:', error);
     res.status(500).json({ error: 'Internal Server Error' });
@@ -350,16 +366,11 @@ app.post('/subscriptionHook', async(req, res) => {
   let correlationId = UUIDGenerator();
   logger.info("new correlationId is:",correlationId)
   let patientId = await db.get_patient_uuid(customerUHID);
-  let token = await tokens.get_billing_access_token();
-  let planName = await axios.get(`https://www.zohoapis.in/subscriptions/v1/plans/${planCode}`, {
-    headers: {
-       Authorization: `Zoho-oauthtoken ${token}`,
-      'X-com-zoho-subscriptions-organizationid' : `${envVariables.BILLING_ORGANIZATION_ID}`
-    }
-  }).then(res=>{
-    return res.data.plan.name;
+//   getting plan_name from Database
+  let planName = await db.get_plan_name(planCode).then(res=>{
+    return res;
   }).catch(err=>{
-    logger("plan Details retreival Error", err)
+    logger("plan name retreival Error", err)
   }); 
 
   const notificationBody = {

@@ -256,6 +256,50 @@ DBModule.Order_Txn_Logs_Insert = (order_msg_id, logs_arr) =>{
     })
 }
 
+// New Table SUBSCRIPTION_PLANS
+DBModule.Insert_plan_table = (plan_code, plan_name) =>{
+    return new Promise((resolve, reject) =>{
+        pool.query('select * from SUBSCRIPTION_PLANS where plan_code = $1', [plan_code] ,(error,res) => {
+            if (error) {
+                logger.error(error);
+                reject(error);
+            }else{
+                if(res.rows.length == 0){
+                    pool.query('INSERT INTO SUBSCRIPTION_PLANS (plan_code, plan_name) VALUES ($1, $2) RETURNING *',[plan_code, plan_name], (error, results) => {
+                        if (error) {
+                            logger.error(error);
+                            reject(error);
+                        }
+                        logger.info("Inserting subscription details in SUBSCRIPTION_PLANS Table - plan_code: ",results.rows[0].plan_code);
+                        resolve(results.rows[0].plan_code);
+                    })
+                }else{
+                    logger.warn("The record is already present in SUBSCRIPTION_PLANS Table "+res.rows[0].plan_code);
+                    resolve(res.rows[0]);
+                }
+            }
+        })
+    })
+}
+
+// Getting plan name using plan code from SUBSCRIPTION_PLANS
+DBModule.get_plan_name = (plan_code) =>{
+    return new Promise((resolve, reject) =>{
+        pool.query('Select plan_name from SUBSCRIPTION_PLANS WHERE plan_code = $1',[plan_code], (error, results) => {
+            if (error) {
+                logger.error(error);
+                reject(error);
+            }
+            if(results.rows[0]){
+                logger.info("Found the plan_name in SUBSCRIPTION_PLANS table  ",results.rows[0].plan_name);
+            }else{
+                logger.info("No Record found to get plan_name in SUBSCRIPTION_PLANS table with plan_code: ", plan_code);
+            }
+            resolve(results.rows[0].plan_name);
+        })
+    })
+}
+
 DBModule.create_subscription_logs = (clinical_uhid, billing_plan_code) =>{
     return new Promise((resolve, reject) =>{
         pool.query('select * from UC_SUBSCRIPTION where clinical_uhid = $1 and billing_plan_code = $2', [clinical_uhid, billing_plan_code] ,(error,res) => {
@@ -267,14 +311,15 @@ DBModule.create_subscription_logs = (clinical_uhid, billing_plan_code) =>{
                     let created_at = new Date();
                     let id = UUIDGenerator();
                     let subscription_status = 'REQUESTED';
-                    let payment_status = 'NIL'
-                    pool.query('INSERT INTO UC_SUBSCRIPTION (id, clinical_uhid, billing_plan_code, subscription_status,payment_status,created_at,updated_at) VALUES ($1, $2, $3, $4, $5, $6,$6) RETURNING *',[id, clinical_uhid, billing_plan_code,subscription_status,payment_status,created_at], (error, results) => {
+                    let payment_status = 'NIL';
+                    let requested_count = 1;
+                    pool.query('INSERT INTO UC_SUBSCRIPTION (id, clinical_uhid, billing_plan_code, subscription_status,payment_status,requested_count,created_at,updated_at) VALUES ($1, $2, $3, $4, $5, $7, $6,$6) RETURNING *',[id, clinical_uhid, billing_plan_code,subscription_status,payment_status,created_at, requested_count], (error, results) => {
                         if (error) {
                             logger.error(error);
                             reject(error);
                         }
                         logger.info("Inserting subscription details in subscription Table - id: ",results.rows[0].id);
-                        resolve(results.rows[0].id);
+                        resolve(results.rows[0]);
                     })
                 }else{
                     logger.warn("The record is already present in UC_SUBSCRIPTION Table "+res.rows[0].billing_plan_code);
@@ -282,6 +327,25 @@ DBModule.create_subscription_logs = (clinical_uhid, billing_plan_code) =>{
                 }
             }
         })
+    })
+}
+
+// update requested count for non-subscribed plans
+DBModule.update_subscription_requestCount = (count, clinical_uhid, billing_plan_code) =>{
+    let current_date = new Date();
+    return new Promise((resolve, reject) =>{
+        pool.query('UPDATE UC_SUBSCRIPTION set requested_count = $1, updated_at = $2 where clinical_uhid = $3 and billing_plan_code = $4 RETURNING *',[count, current_date, clinical_uhid, billing_plan_code], (error, results) => {
+            if (error) {
+                logger.error(error);
+                reject(error);
+            }
+            if(results.rows[0]){
+                logger.info("Updating requested_count in UC_SUBSCRIPTION Table - Total Count: ", count);
+            }else{
+                logger.info("No Record found to update requested_count in UC_SUBSCRIPTION Table");
+            }
+            resolve(results.rowCount);
+        }) 
     })
 }
 
