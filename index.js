@@ -286,6 +286,7 @@ let subscription_logs = await db.create_subscription_logs(patientDetails.clinica
     logger("plan name retreival Error", err)
   });
 if(subscription_logs.subscription_status == 'SUBSCRIBED' && subscription_logs.payment_status == 'PAID'){
+    logger.warn("Plan is already subscribed.");
     res.status(409).json({ error: 'This plan is already subscribed' });
 }else if(subscription_logs.subscription_status == 'REQUESTED' && subscription_logs.payment_status == 'NIL'){
     let count = subscription_logs.requested_count + 1;
