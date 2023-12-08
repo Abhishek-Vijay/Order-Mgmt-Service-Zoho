@@ -277,8 +277,9 @@ zohoServices.invoice = async(uhid, items_list, userObj, msg_id, correlationId, e
 
             if(success_msg){
                 let invoice_no = invoice_details.invoice.invoice_number;
+                let invoice_amount = invoice_details.invoice.total;
                 let invoice_url = invoice_details.invoice.invoice_url.replace("/secure","/securepay").trim();
-                return {msg_id, invoice_no, invoice_url, s3_bucket_url, correlationId};
+                return {msg_id, invoice_no, invoice_url, invoice_amount, s3_bucket_url, correlationId};
             }
         }).catch(error=>{
             if(error.response){

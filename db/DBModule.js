@@ -136,11 +136,11 @@ DBModule.Order_Insert = (id, encounter_id, clinical_uhid, order_details, correla
 } 
 
 // UC_ORDER Invoice Updation Query
-DBModule.Order_Update_Invoice = (id, invoice_number, invoice_url, s3_bucket_url, processing_status, payment_status, correlationId) =>{
+DBModule.Order_Update_Invoice = (id, invoice_number, invoice_url, invoice_amount, s3_bucket_url, processing_status, payment_status, correlationId) =>{
     let current_date = new Date();
     return new Promise((resolve, reject) =>{
         // console.log(id, invoice_number, processing_status);
-        pool.query('UPDATE UC_ORDER SET invoice_number = $2, invoice_url = $5, s3_bucket_url = $6, processing_status = $3, payment_status = $7, UPDATED_AT = $4 WHERE id = $1',[id, invoice_number, processing_status, current_date, invoice_url, s3_bucket_url, payment_status], (error, results) => {
+        pool.query('UPDATE UC_ORDER SET invoice_number = $2, invoice_url = $5, amount = $8, s3_bucket_url = $6, processing_status = $3, payment_status = $7, UPDATED_AT = $4 WHERE id = $1',[id, invoice_number, processing_status, current_date, invoice_url, s3_bucket_url, payment_status, invoice_amount], (error, results) => {
             if (error) {
                 logger.error(error," correlationId Id: ",correlationId);
                 reject(error);
@@ -152,10 +152,10 @@ DBModule.Order_Update_Invoice = (id, invoice_number, invoice_url, s3_bucket_url,
 }
 
 // UC_ORDER Payment Updation Query
-DBModule.Order_Update_Payment = (invoice_number, processing_status, payment_status) =>{
+DBModule.Order_Update_Payment = (invoice_number, processing_status, payment_status, payment_date) =>{
     let current_date = new Date();
     return new Promise((resolve, reject) =>{
-        pool.query('UPDATE UC_ORDER SET processing_status = $2, payment_status = $3, UPDATED_AT = $4 WHERE invoice_number = $1 RETURNING *',[invoice_number, processing_status, payment_status, current_date], (error, results) => {
+        pool.query('UPDATE UC_ORDER SET processing_status = $2, payment_status = $3, payment_date = $5, UPDATED_AT = $4 WHERE invoice_number = $1 RETURNING *',[invoice_number, processing_status, payment_status, current_date, payment_date], (error, results) => {
             if (error) {
                 logger.error(error);
                 reject(error);
@@ -187,6 +187,58 @@ DBModule.Order_Invoice_Urls = (uuid) =>{
             resolve(results.rows);
         }) 
     })   
+}
+
+// UC_INVOICE adding or updating the records here
+DBModule.insert_update_invoice = (invoice_id, clinical_uhid, invoice_number, invoice_url, amount, payment_status) =>{
+    return new Promise((resolve, reject) =>{
+        let current_date = new Date();
+        pool.query('select * from UC_INVOICE where invoice_id = $1', [invoice_id] ,(error,res) => {
+            if (error) {
+                logger.error(error);
+                reject(error);
+            }else{
+                if(res.rows.length == 0){
+                    pool.query('INSERT INTO UC_INVOICE (invoice_id, clinical_uhid, invoice_number, invoice_url, amount, payment_date, payment_status, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, null, $6, $7, $7) RETURNING *', [invoice_id, clinical_uhid, invoice_number, invoice_url, amount, payment_status, current_date], (error, results) => {
+                        if (error) {
+                            logger.error(error);
+                            reject(error);
+                        }
+                        logger.info("Inserting the row in UC_INVOICE Table ",results.rowCount);
+                        resolve(results.rowCount);
+                    })
+                }else{
+                    pool.query('UPDATE UC_INVOICE SET payment_date = $1, payment_status = $2, UPDATED_AT = $1 WHERE invoice_id = $3',[current_date, payment_status, invoice_id], (error, results) => {
+                        if (error) {
+                            logger.error(error);
+                            reject(error);
+                        }
+                        logger.info("Updating the row in UC_INVOICE Table - Invoice ",results.rowCount);
+                        resolve(results.rowCount);
+                    })
+                }
+            }
+        })
+    })
+}
+
+// Getting product_name from SUBSCRIPTION_PRODUCTS Table 
+DBModule.get_product_name = (product_id) =>{
+    return new Promise((resolve, reject) =>{
+        pool.query('Select product_name from SUBSCRIPTION_PRODUCTS WHERE product_id = $1',[product_id], (error, results) => {
+            if (error) {
+                logger.error(error);
+                reject(error);
+            }
+            if(results.rows[0]){
+                logger.info("Found the product_name in SUBSCRIPTION_PRODUCTS table  ",results.rows[0].product_name);
+                // need to update if not available 
+                resolve(results.rows[0].product_name);
+            }else{
+                logger.info("No Record found to get product_name in SUBSCRIPTION_PRODUCTS table with product_id: ", product_id);
+            }
+        })
+    })
 }
 
 DBModule.get_customer_id = (uuid) =>{
