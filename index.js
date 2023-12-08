@@ -129,7 +129,7 @@ let token = await tokens.get_billing_access_token();
         let responseData = JSON.parse(JSON.stringify(response.data));
         responseData.products.forEach((item) => {
           const jsonObject = {
-            productId:item.product_id,
+            id:item.product_id,
             name: item.name,
             description: item.description
           };
