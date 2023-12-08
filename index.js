@@ -214,30 +214,42 @@ let token = await tokens.get_billing_access_token();
      return res.sendStatus(400);
  }
 
+// Calling the API to get all the subscriptions for a User from Zoho Directly 
+//  To-DO This code can only be added when customer_id available in DB
   let patientDetails = await db.get_customer_id(uuid).then(data=>data).catch(err=>{
               logger.error(err);
                return res.sendStatus(400);
   });
-const params = {
-  customer_id: `${patientDetails.customer_id}`
-};
+
+// const params = {
+//   customer_id: `${patientDetails.customer_id}`
+// };
 
 const headers = {
- Authorization: `Zoho-oauthtoken ${token}`,
- 'X-com-zoho-subscriptions-organizationid' : `${envVariables.BILLING_ORGANIZATION_ID}`
+  Authorization: `Zoho-oauthtoken ${token}`,
+  'X-com-zoho-subscriptions-organizationid' : `${envVariables.BILLING_ORGANIZATION_ID}`
+ };
+
+const customerDetails = await axios.get(`https://www.zohoapis.in/subscriptions/v1/customers?cf_uhid=${patientDetails.clinical_uhid}`, {headers: headers})
+let customerDetailsResponse = JSON.parse(JSON.stringify(customerDetails.data));
+
+const params = {
+  customer_id: `${customerDetailsResponse.customers[0].customer_id}`
 };
-  try {
+
+try {
     const response = await axios.get('https://www.zohoapis.in/subscriptions/v1/subscriptions', {
       params: params,
       headers: headers
     });
     const subscriptionInfo = [];
     let responseData = JSON.parse(JSON.stringify(response.data));
-    responseData.subscriptions.forEach((item) => {
+    responseData.subscriptions?.forEach((item) => {
       const jsonObject = {
-        name: item.plan_name,
+        planName: item.plan_name,
+        name: item.name,
         code: item.plan_code,
-        description: ''
+        // description: item.description
       };
       // Push the generated JSON object into the array
       subscriptionInfo.push(jsonObject);
@@ -245,8 +257,16 @@ const headers = {
     const jsonWithRoot = {
       'subscriptionInfo': subscriptionInfo
     };
+    console.log( responseData.subscriptions);
     res.statusCode = 200;
     res.json(jsonWithRoot);
+// try {
+//     let subscribed_plans = await db.get_user_subscription(uuid).then(data=>data).catch(err=>{
+//       logger.error(err);
+//        return res.sendStatus(400);
+//     });
+//     res.statusCode = 200;
+//     res.json({'subscriptionInfo': subscribed_plans});
   } catch (error) {
     console.error('Error while retrieving the subscriptions for a patient:', error);
     res.status(500).json({ error: 'Internal Server Error' });
@@ -361,7 +381,9 @@ app.post('/subscriptionHook', async(req, res) => {
   let paymentStatus = 'PAID';
   let subscriptionStatus = 'SUBSCRIBED';
   let customerName = req.body.customerName;
-  await db.update_subscription_details(subscriptionId, customerUHID,paymentStatus,subscriptionStatus,planCode);
+  let start_date = req.body.start_date;
+  let end_date = req.body.end_date;
+  await db.update_subscription_details(subscriptionId, customerUHID,paymentStatus,subscriptionStatus,planCode,start_date,end_date);
 
   let messageId = UUIDGenerator();
   let correlationId = UUIDGenerator();

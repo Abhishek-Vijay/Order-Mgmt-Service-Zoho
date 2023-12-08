@@ -92,10 +92,10 @@ DBModule.Patient_Update = (clinical_uhid, zoho_contact_id, correlationId) =>{
     })
 }
 
-DBModule.update_subscription_details = (subscriptionId, clinical_uhid, payment_status,subscription_status,planCode) =>{
+DBModule.update_subscription_details = (subscriptionId, clinical_uhid, payment_status,subscription_status,planCode, start_date, end_date) =>{
     let updated_date = new Date();
     return new Promise((resolve, reject) =>{
-        pool.query('UPDATE UC_SUBSCRIPTION SET subscription_id = $1,subscription_status = $2,payment_status = $3,updated_at = $4 WHERE clinical_uhid = $5 and billing_plan_code = $6', [subscriptionId, subscription_status,payment_status,updated_date,clinical_uhid,planCode], (error, results) => {
+        pool.query('UPDATE UC_SUBSCRIPTION SET subscription_id = $1,subscription_status = $2,payment_status = $3,updated_at = $4,start_date = $7,end_date = $8 WHERE clinical_uhid = $5 and billing_plan_code = $6', [subscriptionId, subscription_status,payment_status,updated_date,clinical_uhid,planCode,start_date,end_date], (error, results) => {
             if (error) {
                 logger.error('Error while updating the subscription details',error);
                 reject(error);
@@ -295,6 +295,7 @@ DBModule.get_plan_name = (plan_code) =>{
             }else{
                 logger.info("No Record found to get plan_name in SUBSCRIPTION_PLANS table with plan_code: ", plan_code);
             }
+            // need to update if not available 
             resolve(results.rows[0].plan_name);
         })
     })
@@ -327,6 +328,27 @@ DBModule.create_subscription_logs = (clinical_uhid, billing_plan_code) =>{
                 }
             }
         })
+    })
+}
+
+// Fetch Subscription Details -
+DBModule.get_user_subscription = (uuid) =>{
+    return new Promise((resolve, reject) =>{
+        pool.query(`select sp.plan_code, sp.plan_name from uc_subscription us 
+        inner join patient p on p.clinical_uhid  = us.clinical_uhid 
+        inner join subscription_plans sp on sp.plan_code = us.billing_plan_code 
+        where p.uuid = $1 and us.subscription_status = 'SUBSCRIBED'`,[uuid], (error, results) => {
+            if (error) {
+                logger.error(error);
+                reject(error);
+            }
+            if(results.rowCount){
+                logger.info("Found subscription count in UC_SUBSCRIPTION Table - Total Count: ", results.rowCount);
+            }else{
+                logger.info("No Record found to in UC_SUBSCRIPTION Table to show as subscription for patient:", uuid);
+            }
+            resolve(results.rows);
+        }) 
     })
 }
 
