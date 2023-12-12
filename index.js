@@ -111,8 +111,8 @@ app.get('/order-mgmt/patient/:uuid/order-invoice', async(req,res)=>{
     
 })
 
-//API to list all the plans available
-app.get('/order-mgmt/subscription', async (req, res) => {
+//API to list all the products
+app.get('/order-mgmt/subscriptions/products', async (req, res) => {
 let token = await tokens.get_billing_access_token();
  const correlationId = req.get('X-Correlation-ID');
  if(correlationId == null || correlationId.length == 0){
@@ -120,10 +120,52 @@ let token = await tokens.get_billing_access_token();
      return res.sendStatus(400);
      }
   try {
-    const response = await axios.get('https://www.zohoapis.in/subscriptions/v1/plans', {
+    const response = await axios.get('https://www.zohoapis.in/subscriptions/v1/products', {
       headers: {
          Authorization: `Zoho-oauthtoken ${token}`,
-        'X-com-zoho-subscriptions-organizationid' : `${envVariables.BILLING_ORGANIZATION_ID}`
+        'X-com-zoho-subscriptions-organizationid' : `${envVariables.ORGANIZATION_ID}`
+      }
+    });
+        const planInfo = [];
+        let responseData = JSON.parse(JSON.stringify(response.data));
+        responseData.products.forEach((item) => {
+          const jsonObject = {
+            id:item.product_id,
+            name: item.name,
+            description: item.description
+          };
+          // Push the generated JSON object into the array
+          planInfo.push(jsonObject);
+        });
+        const jsonWithRoot = {
+          'products': planInfo
+        };
+    res.statusCode = 200;
+    res.json(jsonWithRoot);
+  } catch (error) {
+    console.error('Error while retrieving the products:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+//API to list all the plans of a  available
+app.get('/order-mgmt/subscriptions/product/:productId/plans', async (req, res) => {
+let token = await tokens.get_billing_access_token();
+const productId = req.params.productId;
+ const correlationId = req.get('X-Correlation-ID');
+ if(correlationId == null || correlationId.length == 0){
+    logger.error('Correlation ID cannot be empty');
+     return res.sendStatus(400);
+ }
+ if(productId == null || productId.length == 0){
+   logger.error('productId cannot be empty');
+   return res.sendStatus(400);
+ }
+  try {
+    const response = await axios.get(`https://www.zohoapis.in/subscriptions/v1/plans?product_id=${productId}`, {
+      headers: {
+         Authorization: `Zoho-oauthtoken ${token}`,
+        'X-com-zoho-subscriptions-organizationid' : `${envVariables.ORGANIZATION_ID}`
       }
     });
         const planInfo = [];
@@ -140,7 +182,7 @@ let token = await tokens.get_billing_access_token();
           planInfo.push(jsonObject);
         });
         const jsonWithRoot = {
-          'subscriptionInfo': planInfo
+          'productPlans': planInfo
         };
     res.statusCode = 200;
     res.json(jsonWithRoot);
@@ -163,7 +205,7 @@ const planCode = req.params.planCode;
     const response = await axios.get(`https://www.zohoapis.in/subscriptions/v1/plans/${planCode}`, {
       headers: {
          Authorization: `Zoho-oauthtoken ${token}`,
-        'X-com-zoho-subscriptions-organizationid' : `${envVariables.BILLING_ORGANIZATION_ID}`
+        'X-com-zoho-subscriptions-organizationid' : `${envVariables.ORGANIZATION_ID}`
       }
     });
         const planInfo = [];
@@ -315,7 +357,7 @@ if(subscription_logs.subscription_status == 'SUBSCRIBED' && subscription_logs.pa
     await db.update_subscription_requestCount(count, subscription_logs.clinical_uhid, subscription_logs.billing_plan_code);
     const headers = {
         Authorization: `Zoho-oauthtoken ${token}`,
-        'X-com-zoho-subscriptions-organizationid' : `${envVariables.BILLING_ORGANIZATION_ID}`
+        'X-com-zoho-subscriptions-organizationid' : `${envVariables.ORGANIZATION_ID}`
         };
 
         const customerDetails = await axios.get(`https://www.zohoapis.in/subscriptions/v1/customers?cf_uhid=${patientDetails.clinical_uhid}`, {headers: headers})
