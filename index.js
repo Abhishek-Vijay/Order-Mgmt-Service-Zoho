@@ -33,7 +33,8 @@ const personParams = {
 };
 
 const db = require('./db/DBModule');
-const { UUIDGenerator } = require('./helper/generator');
+// const { UUIDGenerator } = require('./helper/generator');
+const { SubscriptionNotification, InvoiceNotification } = require('./helper/Notification');
 
 const app = express() // creates http server
 const processInvoiceMessage = require('./processInvoice');
@@ -256,30 +257,42 @@ let token = await tokens.get_billing_access_token();
      return res.sendStatus(400);
  }
 
+// Calling the API to get all the subscriptions for a User from Zoho Directly 
+//  To-DO This code can only be added when customer_id available in DB
   let patientDetails = await db.get_customer_id(uuid).then(data=>data).catch(err=>{
               logger.error(err);
                return res.sendStatus(400);
   });
-const params = {
-  customer_id: `${patientDetails.customer_id}`
-};
+
+// const params = {
+//   customer_id: `${patientDetails.customer_id}`
+// };
 
 const headers = {
- Authorization: `Zoho-oauthtoken ${token}`,
- 'X-com-zoho-subscriptions-organizationid' : `${envVariables.ORGANIZATION_ID}`
+  Authorization: `Zoho-oauthtoken ${token}`,
+  'X-com-zoho-subscriptions-organizationid' : `${envVariables.BILLING_ORGANIZATION_ID}`
+ };
+
+const customerDetails = await axios.get(`https://www.zohoapis.in/subscriptions/v1/customers?cf_uhid=${patientDetails.clinical_uhid}`, {headers: headers})
+let customerDetailsResponse = JSON.parse(JSON.stringify(customerDetails.data));
+
+const params = {
+  customer_id: `${customerDetailsResponse.customers[0].customer_id}`
 };
-  try {
+
+try {
     const response = await axios.get('https://www.zohoapis.in/subscriptions/v1/subscriptions', {
       params: params,
       headers: headers
     });
     const subscriptionInfo = [];
     let responseData = JSON.parse(JSON.stringify(response.data));
-    responseData.subscriptions.forEach((item) => {
+    responseData.subscriptions?.forEach((item) => {
       const jsonObject = {
-        name: item.plan_name,
+        planName: item.plan_name,
+        name: item.name,
         code: item.plan_code,
-        description: ''
+        // description: item.description
       };
       // Push the generated JSON object into the array
       subscriptionInfo.push(jsonObject);
@@ -287,8 +300,16 @@ const headers = {
     const jsonWithRoot = {
       'subscriptionInfo': subscriptionInfo
     };
+    console.log( responseData.subscriptions);
     res.statusCode = 200;
     res.json(jsonWithRoot);
+// try {
+//     let subscribed_plans = await db.get_user_subscription(uuid).then(data=>data).catch(err=>{
+//       logger.error(err);
+//        return res.sendStatus(400);
+//     });
+//     res.statusCode = 200;
+//     res.json({'subscriptionInfo': subscribed_plans});
   } catch (error) {
     console.error('Error while retrieving the subscriptions for a patient:', error);
     res.status(500).json({ error: 'Internal Server Error' });
@@ -377,11 +398,14 @@ app.post('/paymentHook', async(req, res) => {
     // print request body
     if(req.body.status){
         let processing_status;
+        let payment_date = null;
         logger.info(req.body);
-        if (req.body.status.toUpperCase() == 'PAID') processing_status = 'PAYMENT_COMPLETED';
+        if (req.body.status.toUpperCase() == 'PAID'){ 
+          payment_date = new Date();
+          processing_status = 'PAYMENT_COMPLETED';}
         else if (req.body.status.toUpperCase() == 'FAILED') processing_status = 'PAYMENT_FAILED';
         else if (req.body.status.toUpperCase() == 'OVERDUE') processing_status = 'PAYMENT_OVERDUE';
-        await db.Order_Update_Payment(req.body.invoice_number, processing_status, req.body.status.toUpperCase()).then(data=>data).catch(err=>{
+        await db.Order_Update_Payment(req.body.invoice_number, processing_status, req.body.status.toUpperCase(), payment_date).then(data=>data).catch(err=>{
             logger.error(err);
             return;
         });
@@ -403,11 +427,10 @@ app.post('/subscriptionHook', async(req, res) => {
   let paymentStatus = 'PAID';
   let subscriptionStatus = 'SUBSCRIBED';
   let customerName = req.body.customerName;
-  await db.update_subscription_details(subscriptionId, customerUHID,paymentStatus,subscriptionStatus,planCode);
+  let start_date = req.body.start_date;
+  let end_date = req.body.end_date;
+  await db.update_subscription_details(subscriptionId, customerUHID,paymentStatus,subscriptionStatus,planCode,start_date,end_date);
 
-  let messageId = UUIDGenerator();
-  let correlationId = UUIDGenerator();
-  logger.info("new correlationId is:",correlationId)
   let patientId = await db.get_patient_uuid(customerUHID);
 //   getting plan_name from Database
   let planName = await db.get_plan_name(planCode).then(res=>{
@@ -416,57 +439,56 @@ app.post('/subscriptionHook', async(req, res) => {
     logger("plan name retreival Error", err)
   }); 
 
-  const notificationBody = {
-            key: {
-                messageId: messageId,
-                clinicalUhid: customerUHID,
-                patientId: patientId,
-                correlationId: correlationId
-            },
-            message: {
-                type: "MOBILE_PUSH",
-                content: {
-                    title: "Care subscription enrollment status",
-                    body: `Dear ${customerName}, You have successfully subscribed with ${planName}`,
-                    type: "CARE_SUBSCRIPTION" 
-                }
-            }
-  }
-  logger.info("Notification Body to be send in SQS",notificationBody);
-
-// Notification queue
-const notificationInput = { // SendMessageRequestInput
-    QueueUrl: envVariables.NOTIFICATION_QUEUE_URL, // required
-    MessageBody: JSON.stringify(notificationBody), // required
-    DelaySeconds: 0,
-    MaxNumberOfMessages: 1
-  };
-
-try {
-    let command = new SendMessageCommand(notificationInput)
-    const data = await sqsClient.send(command);
-    if (data.MessageId) {
-        logger.info("Notification message is successfully pushed with MessageId", data.MessageId)
-    }
-} catch (err) {
-    logger.error("Send Error", err);
-}
+  SubscriptionNotification(customerUHID,patientId,customerName,planName);
 
   const data = { type: 'Subscribed successfully' };
       res.send(data);
 });
 
-//app.post('/paymentFailure', async(req, res) => {
-// console.log('Request received to update payment failure status');
-//  console.log(req.body);
-//   let customerId = req.body.customerId;
-//   let paymentStatus = req.body.paymentStatus;
-//  let clinical_uhid = await db.get_clinical_uhid(customerId);
-//  let subscriptionStatus = 'NOT_SUBSCRIBED';
-//  await db.update_subscription_details(subscriptionId, clinical_uhid,paymentStatus,subscriptionStatus);
-//  const data = { type: 'Subscribed successfully' };
-//      res.json(data);
-//});
+app.post('/subscriptionPaymentHook', async(req, res) => {
+  logger.trace('Request received to update subscription details');
+  logger.info("Received information in request body",req.body);
+  let invoice_id = req.body.invoice_id;
+  let clinical_uhid = req.body.customer_UHID;
+  let invoice_number = req.body.invoice_number;
+  let invoice_url =  req.body.invoice_url.replace("/secure","/securepay").trim();
+  let amount =  req.body.invoice_total;
+  let payment_status = req.body.invoice_status.toUpperCase() === 'SENT' ? "DUE" : req.body.invoice_status.toUpperCase() === 'PAID' ? "PAID" : "FAILED"
+  let product_id = req.body.product_id;
+  let customer_name =  req.body.customer_name;
+
+  try{
+  //  Inserting or Updating invoice record in UC_INVOICE
+  await db.insert_update_invoice(invoice_id, clinical_uhid, invoice_number, invoice_url, amount, payment_status);
+
+  let patientId = await db.get_patient_uuid(clinical_uhid);
+//   getting product_name from Database
+  let productName = await db.get_product_name(product_id).then(res=>{
+    return res;
+  }).catch(err=>{
+    logger("plan name retreival Error", err)
+  }); 
+
+  let token = await tokens.get_billing_access_token();
+  const headers = {
+    Authorization: `Zoho-oauthtoken ${token}`,
+    'X-com-zoho-subscriptions-organizationid' : `${envVariables.BILLING_ORGANIZATION_ID}`
+  };
+
+  const invoiceResponse = await axios.get(`https://www.zohoapis.in/subscriptions/v1/invoices/${invoice_id}`,{headers})
+  let responseData = JSON.parse(JSON.stringify(invoiceResponse.data));
+  let planName = responseData.invoice.invoice_items[0].name;
+
+  if(payment_status === "PAID") SubscriptionNotification(clinical_uhid,patientId,customer_name,planName,productName);
+  else if(payment_status === "DUE") InvoiceNotification(clinical_uhid,patientId,customer_name,planName,productName);
+
+    const data = { type: 'Subscribed successfully' };
+    res.json(data);
+  }catch (err){
+    logger.error("subscriptionPaymentHook Error", err);
+  }
+
+});
 
 // app.listen() part should always be located in the last line of your code
 app.listen(envVariables.APP_SERVER_PORT, () => {
