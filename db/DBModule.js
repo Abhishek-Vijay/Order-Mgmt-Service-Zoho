@@ -174,13 +174,13 @@ DBModule.Order_Update_Payment = (invoice_number, processing_status, payment_stat
 DBModule.Order_Invoice_Urls = (uuid) =>{
     // let current_date = new Date();
     return new Promise((resolve, reject) =>{
-        pool.query('Select uc_order.encounter_id, uc_order.invoice_number, uc_order.invoice_url, uc_order.processing_status, uc_order.clinical_uhid, uc_order.payment_status, uc_order.created_at from UC_ORDER uc_order inner join Patient p on p.clinical_uhid = uc_order.clinical_uhid WHERE p.uuid = $1',[uuid], (error, results) => {
+        pool.query('(Select uo.invoice_number, uo.invoice_url, uo.clinical_uhid, uo.payment_status, uo.created_at, uo.amount, uo.payment_date from UC_ORDER uo inner join Patient p on p.clinical_uhid = uo.clinical_uhid WHERE p.uuid = $1) UNION ALL (Select ui.invoice_number, ui.invoice_url, ui.clinical_uhid, ui.payment_status, ui.created_at, ui.amount, ui.payment_date from UC_INVOICE ui inner join Patient p on p.clinical_uhid = ui.clinical_uhid WHERE p.uuid = $1)',[uuid], (error, results) => {
             if (error) {
                 logger.error(error);
                 reject(error);
             }
             if(results.rows[0]){
-                logger.info("Found the invoice url in UC_ORDER Table for -  uuid: ",uuid, "encounter id: ",results.rows[0].encounter_id);
+                logger.info("Found the invoice url in UC_ORDER Table for -  uuid: ",uuid);
             }else{
                 logger.info("No Record found to get invoice url in UC_ORDER Table for - uuid: ",uuid);
             }
@@ -199,7 +199,8 @@ DBModule.insert_update_invoice = (invoice_id, clinical_uhid, invoice_number, inv
                 reject(error);
             }else{
                 if(res.rows.length == 0){
-                    pool.query('INSERT INTO UC_INVOICE (invoice_id, clinical_uhid, invoice_number, invoice_url, amount, payment_date, payment_status, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, null, $6, $7, $7) RETURNING *', [invoice_id, clinical_uhid, invoice_number, invoice_url, amount, payment_status, current_date], (error, results) => {
+                    let payment_date = payment_status === 'PAID' ? new Date() : null;
+                    pool.query('INSERT INTO UC_INVOICE (invoice_id, clinical_uhid, invoice_number, invoice_url, amount, payment_date, payment_status, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $8, $6, $7, $7) RETURNING *', [invoice_id, clinical_uhid, invoice_number, invoice_url, amount, payment_status, current_date, payment_date], (error, results) => {
                         if (error) {
                             logger.error(error);
                             reject(error);

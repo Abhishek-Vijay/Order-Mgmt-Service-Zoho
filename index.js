@@ -88,12 +88,12 @@ app.get('/order-mgmt/patient/:uuid/order-invoice', async(req,res)=>{
                 }
             }).map(newobj=>{ 
                 return {
-                    encounterId: newobj.encounter_id,
                     invoiceNumber: newobj.invoice_number,
                     invoiceUrl: newobj.invoice_url,
-                    processingStatus: newobj.processing_status,
+                    amount: newobj.amount,
+                    createdAt: newobj.created_at.toISOString().replace("T", " "),
                     paymentStatus: newobj.payment_status,
-                    createdAt: newobj.created_at.toISOString().replace("T", " ")
+                    paymentDate: newobj.payment_date.toISOString().replace("T", " ")
                     // createdAt: newobj.created_at.toLocaleString().replace(",","")
                 }
             });
@@ -245,6 +245,7 @@ try {
     });
     const subscriptionInfo = [];
     let responseData = JSON.parse(JSON.stringify(response.data));
+    // console.log(responseData.subscriptions);
     responseData.subscriptions?.forEach((item) => {
       const jsonObject = {
         planName: item.plan_name,
@@ -436,6 +437,7 @@ app.post('/subscriptionPaymentHook', async(req, res) => {
   const invoiceResponse = await axios.get(`https://www.zohoapis.in/subscriptions/v1/invoices/${invoice_id}`,{headers})
   let responseData = JSON.parse(JSON.stringify(invoiceResponse.data));
   let planName = responseData.invoice.invoice_items[0].name;
+  console.log(responseData.invoice.invoice_items[0].description.split('(')[1].split(')')[0]);
 
   if(payment_status === "PAID") SubscriptionNotification(clinical_uhid,patientId,customer_name,planName,productName);
   else if(payment_status === "DUE") InvoiceNotification(clinical_uhid,patientId,customer_name,planName,productName);
