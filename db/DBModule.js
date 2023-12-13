@@ -152,10 +152,10 @@ DBModule.Order_Update_Invoice = (id, invoice_number, invoice_url, invoice_amount
 }
 
 // UC_ORDER Payment Updation Query
-DBModule.Order_Update_Payment = (invoice_number, processing_status, payment_status, payment_date) =>{
+DBModule.Order_Update_Payment = (invoice_number, processing_status, payment_status, payment_date, invoice_url) =>{
     let current_date = new Date();
     return new Promise((resolve, reject) =>{
-        pool.query('UPDATE UC_ORDER SET processing_status = $2, payment_status = $3, payment_date = $5, UPDATED_AT = $4 WHERE invoice_number = $1 RETURNING *',[invoice_number, processing_status, payment_status, current_date, payment_date], (error, results) => {
+        pool.query('UPDATE UC_ORDER SET processing_status = $2, payment_status = $3, payment_date = $5, invoice_url = $6, UPDATED_AT = $4 WHERE invoice_number = $1 RETURNING *',[invoice_number, processing_status, payment_status, current_date, payment_date, invoice_url], (error, results) => {
             if (error) {
                 logger.error(error);
                 reject(error);
@@ -209,7 +209,7 @@ DBModule.insert_update_invoice = (invoice_id, clinical_uhid, invoice_number, inv
                         resolve(results.rowCount);
                     })
                 }else{
-                    pool.query('UPDATE UC_INVOICE SET payment_date = $1, payment_status = $2, UPDATED_AT = $1 WHERE invoice_id = $3',[current_date, payment_status, invoice_id], (error, results) => {
+                    pool.query('UPDATE UC_INVOICE SET payment_date = $1, payment_status = $2, invoice_url = $4, UPDATED_AT = $1 WHERE invoice_id = $3',[current_date, payment_status, invoice_id, invoice_url], (error, results) => {
                         if (error) {
                             logger.error(error);
                             reject(error);

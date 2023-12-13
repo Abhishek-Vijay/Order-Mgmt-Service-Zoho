@@ -400,13 +400,15 @@ app.post('/paymentHook', async(req, res) => {
     if(req.body.status){
         let processing_status;
         let payment_date = null;
+        let invoice_url =  req.body.invoice_url?.replace("/secure","/securepay").trim();
         logger.info(req.body);
         if (req.body.status.toUpperCase() == 'PAID'){ 
           payment_date = new Date();
+          invoice_url =  req.body.invoice_url;
           processing_status = 'PAYMENT_COMPLETED';}
         else if (req.body.status.toUpperCase() == 'FAILED') processing_status = 'PAYMENT_FAILED';
         else if (req.body.status.toUpperCase() == 'OVERDUE') processing_status = 'PAYMENT_OVERDUE';
-        await db.Order_Update_Payment(req.body.invoice_number, processing_status, req.body.status.toUpperCase(), payment_date).then(data=>data).catch(err=>{
+        await db.Order_Update_Payment(req.body.invoice_number, processing_status, req.body.status.toUpperCase(), payment_date, invoice_url).then(data=>data).catch(err=>{
             logger.error(err);
             return;
         });
@@ -454,12 +456,13 @@ app.post('/subscriptionPaymentHook', async(req, res) => {
   let invoice_number = req.body.invoice_number;
   let invoice_url =  req.body.invoice_url?.replace("/secure","/securepay").trim();
   let amount =  req.body.invoice_total;
-  let payment_status = req.body.invoice_status?.toUpperCase() === 'SENT' ? "DUE" : req.body.invoice_status.toUpperCase() === 'PAID' ? "PAID" : "FAILED"
+  let payment_status = req.body.invoice_status?.toUpperCase() === 'SENT' ? "DUE" : req.body.invoice_status?.toUpperCase() === 'PAID' ? "PAID" : "FAILED"
   let product_id = req.body.product_id;
   let customer_name =  req.body.customer_name;
 
   try{
   //  Inserting or Updating invoice record in UC_INVOICE
+  invoice_url = payment_status === 'PAID' ? req.body.invoice_url : invoice_url
   await db.insert_update_invoice(invoice_id, clinical_uhid, invoice_number, invoice_url, amount, payment_status);
 
   let patientId = await db.get_patient_uuid(clinical_uhid);
@@ -479,7 +482,7 @@ app.post('/subscriptionPaymentHook', async(req, res) => {
   const invoiceResponse = await axios.get(`https://www.zohoapis.in/subscriptions/v1/invoices/${invoice_id}`,{headers})
   let responseData = JSON.parse(JSON.stringify(invoiceResponse.data));
   let planName = responseData.invoice.invoice_items[0].name;
-  console.log(responseData.invoice.invoice_items[0].description.split('(')[1].split(')')[0]);
+  // console.log(responseData.invoice.invoice_items[0].description.split('(')[1].split(')')[0]);
 
   if(payment_status === "PAID") SubscriptionNotification(clinical_uhid,patientId,customer_name,planName,productName);
   else if(payment_status === "DUE") InvoiceNotification(clinical_uhid,patientId,customer_name,planName,productName);
