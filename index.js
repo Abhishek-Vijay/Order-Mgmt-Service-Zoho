@@ -91,7 +91,7 @@ app.get('/order-mgmt/patient/:uuid/order-invoice', async(req,res)=>{
                     invoiceNumber: newobj.invoice_number,
                     invoiceUrl: newobj.invoice_url,
                     amount: newobj.amount,
-                    createdAt: newobj.created_at.toISOString().replace("T", " "),
+                    createdAt: newobj.created_at?.toISOString().replace("T", " "),
                     paymentStatus: newobj.payment_status,
                     paymentDate: newobj.payment_date?.toISOString().replace("T", " ")
                     // createdAt: newobj.created_at.toLocaleString().replace(",","")
@@ -454,7 +454,7 @@ app.post('/subscriptionPaymentHook', async(req, res) => {
   let invoice_number = req.body.invoice_number;
   let invoice_url =  req.body.invoice_url?.replace("/secure","/securepay").trim();
   let amount =  req.body.invoice_total;
-  let payment_status = req.body.invoice_status.toUpperCase() === 'SENT' ? "DUE" : req.body.invoice_status.toUpperCase() === 'PAID' ? "PAID" : "FAILED"
+  let payment_status = req.body.invoice_status?.toUpperCase() === 'SENT' ? "DUE" : req.body.invoice_status.toUpperCase() === 'PAID' ? "PAID" : "FAILED"
   let product_id = req.body.product_id;
   let customer_name =  req.body.customer_name;
 
