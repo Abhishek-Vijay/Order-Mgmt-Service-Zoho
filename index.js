@@ -10,7 +10,7 @@ var logger = log4js.getLogger();
 logger.level = "debug";
 
 // Import required AWS SDK clients and commands for Node.js
-const { SQSClient, ReceiveMessageCommand, SendMessageCommand } = require("@aws-sdk/client-sqs");
+const { SQSClient, ReceiveMessageCommand } = require("@aws-sdk/client-sqs");
 // Create SQS service object.
 const sqsClient = new SQSClient({region: envVariables.REGION});
 
@@ -93,7 +93,7 @@ app.get('/order-mgmt/patient/:uuid/order-invoice', async(req,res)=>{
                     amount: newobj.amount,
                     createdAt: newobj.created_at.toISOString().replace("T", " "),
                     paymentStatus: newobj.payment_status,
-                    paymentDate: newobj.payment_date.toISOString().replace("T", " ")
+                    paymentDate: newobj.payment_date?.toISOString().replace("T", " ")
                     // createdAt: newobj.created_at.toLocaleString().replace(",","")
                 }
             });
@@ -123,7 +123,7 @@ let token = await tokens.get_billing_access_token();
     const response = await axios.get('https://www.zohoapis.in/subscriptions/v1/products', {
       headers: {
          Authorization: `Zoho-oauthtoken ${token}`,
-        'X-com-zoho-subscriptions-organizationid' : `${envVariables.ORGANIZATION_ID}`
+        'X-com-zoho-subscriptions-organizationid' : `${envVariables.BILLING_ORGANIZATION_ID}`
       }
     });
         const planInfo = [];
@@ -143,12 +143,12 @@ let token = await tokens.get_billing_access_token();
     res.statusCode = 200;
     res.json(jsonWithRoot);
   } catch (error) {
-    console.error('Error while retrieving the products:', error);
+    logger.error('Error while retrieving the products:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
-//API to list all the plans of a  available
+//API to list all the plans of a product available
 app.get('/order-mgmt/subscriptions/product/:productId/plans', async (req, res) => {
 let token = await tokens.get_billing_access_token();
 const productId = req.params.productId;
@@ -165,7 +165,7 @@ const productId = req.params.productId;
     const response = await axios.get(`https://www.zohoapis.in/subscriptions/v1/plans?product_id=${productId}`, {
       headers: {
          Authorization: `Zoho-oauthtoken ${token}`,
-        'X-com-zoho-subscriptions-organizationid' : `${envVariables.ORGANIZATION_ID}`
+        'X-com-zoho-subscriptions-organizationid' : `${envVariables.BILLING_ORGANIZATION_ID}`
       }
     });
         const planInfo = [];
@@ -187,7 +187,7 @@ const productId = req.params.productId;
     res.statusCode = 200;
     res.json(jsonWithRoot);
   } catch (error) {
-    console.error('Error while retrieving the plans:', error);
+    logger.error('Error while retrieving the plans:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
