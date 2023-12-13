@@ -452,7 +452,7 @@ app.post('/subscriptionPaymentHook', async(req, res) => {
   let invoice_id = req.body.invoice_id;
   let clinical_uhid = req.body.customer_UHID;
   let invoice_number = req.body.invoice_number;
-  let invoice_url =  req.body.invoice_url.replace("/secure","/securepay").trim();
+  let invoice_url =  req.body.invoice_url?.replace("/secure","/securepay").trim();
   let amount =  req.body.invoice_total;
   let payment_status = req.body.invoice_status.toUpperCase() === 'SENT' ? "DUE" : req.body.invoice_status.toUpperCase() === 'PAID' ? "PAID" : "FAILED"
   let product_id = req.body.product_id;

@@ -42,7 +42,13 @@ const SubscriptionNotification = async(customerUHID,patientId,customerName,planN
     QueueUrl: envVariables.NOTIFICATION_QUEUE_URL, // required
     MessageBody: JSON.stringify(notificationBody), // required
     DelaySeconds: 0,
-    MaxNumberOfMessages: 1
+    MaxNumberOfMessages: 1,
+    MessageAttributes:{
+        messageType:{
+            StringValue: "CARE_SUBSCRIPTION",
+            DataType: "String", // required
+        }
+    }
     };
     try {
         let command = new SendMessageCommand(notificationInput)
