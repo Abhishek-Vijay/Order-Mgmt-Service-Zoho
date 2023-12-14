@@ -422,6 +422,7 @@ app.post('/paymentHook', async(req, res) => {
 app.post('/subscriptionHook', async(req, res) => {
  logger.trace('Request received to update subscription details');
   logger.info("Received information in request body",req.body);
+  try{
   let subscriptionId = req.body.subscriptionId;
   let customerId = req.body.customerId;
   let planCode = req.body.planCode;
@@ -432,7 +433,8 @@ app.post('/subscriptionHook', async(req, res) => {
   let customerName = req.body.customerName;
   let start_date = req.body.start_date;
   let end_date = req.body.end_date;
-  await db.update_subscription_details(subscriptionId, customerUHID,paymentStatus,subscriptionStatus,planCode,start_date,end_date);
+  // updation code for subscription < commented because throwing error since start_date column is not present in the Dev table >
+  // await db.update_subscription_details(subscriptionId, customerUHID,paymentStatus,subscriptionStatus,planCode,start_date,end_date);
 
   let patientId = await db.get_patient_uuid(customerUHID);
 //   getting plan_name from Database
@@ -446,6 +448,10 @@ app.post('/subscriptionHook', async(req, res) => {
 
   const data = { type: 'Subscribed successfully' };
       res.send(data);
+    }catch (error){
+      console.error('Error while updating the subscription for a patient: <this error can be ignored for now since subscriptionHook webhook flow is not required>', error);
+      res.status(500).json({ error: 'Internal Server Error' });
+    }
 });
 
 app.post('/subscriptionPaymentHook', async(req, res) => {

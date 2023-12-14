@@ -27,7 +27,7 @@ const SubscriptionNotification = async(customerUHID,patientId,customerName,planN
             content: {
                 title: "Care subscription enrollment status",
                 body: `Dear ${customerName}, You have successfully subscribed with ${productName} - ${planName}`,
-                type: "CARE_SUBSCRIPTION",
+                type: "CARE_SUBSCRIPTION_CREATED",
                 additionalInfo:{
                     isUcMember:"true",
                     planName: planName
@@ -45,7 +45,7 @@ const SubscriptionNotification = async(customerUHID,patientId,customerName,planN
     MaxNumberOfMessages: 1,
     MessageAttributes:{
         messageType:{
-            StringValue: "CARE_SUBSCRIPTION",
+            StringValue: "CARE_SUBSCRIPTION_CREATED",
             DataType: "String", // required
         }
     }
