@@ -468,7 +468,8 @@ app.post('/subscriptionPaymentHook', async(req, res) => {
 
   try{
   //  Inserting or Updating invoice record in UC_INVOICE
-  invoice_url = payment_status === 'PAID' ? req.body.invoice_url : invoice_url
+  invoice_url = payment_status === 'PAID' ? req.body.invoice_url : invoice_url;
+  if(clinical_uhid == "") throw new Error("Clinical_UHID should not be empty, Hence not processing this request.");
   await db.insert_update_invoice(invoice_id, clinical_uhid, invoice_number, invoice_url, amount, payment_status);
 
   let patientId = await db.get_patient_uuid(clinical_uhid);

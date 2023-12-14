@@ -20,6 +20,7 @@ const envVariables = {
     INVOICE_QUEUE_URL: get(env, 'INVOICE_QUEUE_URL') || 'https://sqs.ap-south-1.amazonaws.com/315872761357/local-uc-invoice-generation',
     PERSON_QUEUE_URL: get(env, 'PERSON_QUEUE_URL') || 'https://sqs.ap-south-1.amazonaws.com/315872761357/local-uc-clinical-person-info',
     NOTIFICATION_QUEUE_URL: get(env, 'NOTIFICATION_QUEUE_URL') || 'https://sqs.ap-south-1.amazonaws.com/315872761357/local-uc-notification',
+    SUBSCRIPTION_QUEUE_URL: get(env, 'SUBSCRIPTION_QUEUE_URL') || 'https://sqs.ap-south-1.amazonaws.com/315872761357/local-uc-notification',
     DB: {
         POSTGRES_USER: get(env, 'POSTGRES_USER') || 'postgres',
         POSTGRES_HOST: get(env, 'POSTGRES_HOST') || 'localhost',

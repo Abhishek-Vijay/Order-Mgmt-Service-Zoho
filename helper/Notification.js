@@ -27,7 +27,8 @@ const SubscriptionNotification = async(customerUHID,patientId,customerName,planN
             content: {
                 title: "Care subscription enrollment status",
                 body: `Dear ${customerName}, You have successfully subscribed with ${productName} - ${planName}`,
-                type: "CARE_SUBSCRIPTION_CREATED",
+                type: "CARE_SUBSCRIPTION",
+                status : "CREATED",
                 additionalInfo:{
                     isUcMember:"true",
                     planName: planName
@@ -39,13 +40,13 @@ const SubscriptionNotification = async(customerUHID,patientId,customerName,planN
 
     // Notification queue
     const notificationInput = { // SendMessageRequestInput
-    QueueUrl: envVariables.NOTIFICATION_QUEUE_URL, // required
+    QueueUrl: envVariables.SUBSCRIPTION_QUEUE_URL, // required
     MessageBody: JSON.stringify(notificationBody), // required
     DelaySeconds: 0,
     MaxNumberOfMessages: 1,
     MessageAttributes:{
         messageType:{
-            StringValue: "CARE_SUBSCRIPTION_CREATED",
+            StringValue: "CARE_SUBSCRIPTION",
             DataType: "String", // required
         }
     }
@@ -61,7 +62,7 @@ const SubscriptionNotification = async(customerUHID,patientId,customerName,planN
     }
 }
 
-const InvoiceNotification = async(customerUHID,patientId,customerName,planName,productName) =>{
+const InvoiceNotification = async(customerUHID,patientId,customerName,planName="",productName="") =>{
     let messageId = UUIDGenerator();
     let correlationId = UUIDGenerator();
     logger.info("new correlationId is:",correlationId)
