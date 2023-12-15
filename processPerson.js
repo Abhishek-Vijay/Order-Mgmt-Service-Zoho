@@ -12,6 +12,7 @@ const sqsClient = new SQSClient({region: envVariables.REGION});
 
 const processPersonMessage = async(message) =>{
     // Process the message here
+    try{
     logger.info('Received message:', message.Body);
     let msg = JSON.parse(message.Body);
     logger.info("Processing for the customer with"," correlation Id: ",msg.key.correlationId, " patient uhid: ",msg.key.clinicalUhid);
@@ -96,6 +97,9 @@ const processPersonMessage = async(message) =>{
                 logger.error("Error while deleting ", err);
             };
         }
+    }catch(error){
+        logger.error("Some Error happened :", error);
+    }
 }
 
 module.exports = processPersonMessage;

@@ -11,6 +11,7 @@ const { SQSClient, DeleteMessageCommand } = require("@aws-sdk/client-sqs");
 const sqsClient = new SQSClient({region: envVariables.REGION});
 
 const processInvoiceMessage = async(message) => {
+    try{
     // Process the message here
     logger.info('Received message:', message.Body);
     let msg = JSON.parse(message.Body);
@@ -125,6 +126,9 @@ const processInvoiceMessage = async(message) => {
             logger.error("Error while deleting ", err);
         };
     }
+}catch(error){
+    logger.error("Some Error happened :", error);
+}
 }
 
 module.exports = processInvoiceMessage;
