@@ -268,10 +268,11 @@ DBModule.get_patient_uuid = (clinical_uhid) =>{
             }
             if(results.rows[0]){
                 logger.info("Found the uuid in PATIENT table with clinical_uhid: ",clinical_uhid);
+                resolve(results.rows[0].uuid);
             }else{
                 logger.info("No Record found to get uuid in PATIENT table with clinical_uhid: ",clinical_uhid);
+                reject("This patient is not available in Patient Table.")
             }
-            resolve(results.rows[0].uuid);
         })
     })
 }
