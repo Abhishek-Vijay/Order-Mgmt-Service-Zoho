@@ -88,12 +88,12 @@ const processInvoiceMessage = async(message) => {
                         return response;
                     }).catch(async(error)=>{
                         logger.error(error)
-                        console.log("came here");
-                        await db.Order_Update_Invoice(error.message.split("<>")[1], null, null, null, "INVOICE_FAILED", null, error.message.split("->")[1]).then(data=>data).catch(err=>{
+                        console.log("came here in processing error");
+                        await db.Order_Update_Invoice(error.message.split("<>")[1], null, null, null, null, "INVOICE_FAILED", null, error.message.split("->")[1]).then(data=>data).catch(err=>{
                             logger.error("INVOICE_FAILED ",err);
                             return;
                         });
-                        return error;
+                        return;
                     })
             
                     if(invoice_response){
