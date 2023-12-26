@@ -1,6 +1,6 @@
 const envVariables = require('../helper/envHelper');
 const axios = require('axios');
-const get_access_token = require('./access_token_Module');
+const tokens = require('./access_token_Module');
 
 // S3 related imports
 const { S3Client, PutObjectCommand} = require("@aws-sdk/client-s3");
@@ -55,11 +55,11 @@ const accessToken = async(correlationId,uhid) =>{
             if(token_timer && ((Date.now()) - token_timer < (token.expires_in-300)*1000)){
                 logger.info("token without any API call ",token.access_token," correlationId Id: ",correlationId, " patient uhid: ",uhid);
             }else{
-                token = await get_access_token(uhid, correlationId);
+                token = await tokens.get_access_token();
                 logger.info("token after API call because expired ",token.access_token," correlationId Id: ",correlationId, " patient uhid: ",uhid);
             }
         }else{
-            token = await get_access_token(uhid, correlationId);
+            token = await tokens.get_access_token();
             logger.info("token after API call ",token.access_token," correlationId Id: ",correlationId, " patient uhid: ",uhid);
         }
 
@@ -90,7 +90,7 @@ const zohoUserCreationOrUpdation = async(userObj, correlationId, uhid, taskType)
                                    {
                                        "first_name": `${userObj?.firstName || res.data.contacts[0].first_name}`,
                                        "last_name": `${userObj?.lastName || res.data.contacts[0].last_name}`,
-                                       "email": `${userObj?.emailId.trim() || res.data.contacts[0].email}`,
+                                       "email": `${userObj?.emailId?.trim() || res.data.contacts[0].email}`,
                                        "is_primary_contact": true,
                                        "enable_portal": true
                                    }
@@ -109,8 +109,10 @@ const zohoUserCreationOrUpdation = async(userObj, correlationId, uhid, taskType)
                     return res.data.contacts[0].contact_id;
                 }else if(taskType == "CREATE_PERSON" || taskType == "CREATE_ORDER"){
                     logger.warn("couldn't find contact in books, creating contact..."," correlationId Id: ",correlationId, " patient uhid: ",uhid);
-                    return axios.post(`https://www.zohoapis.in/books/v3/contacts?organization_id=${envVariables.ORGANIZATION_ID}`,userObj,config).then(result=>{
+                    return axios.post(`https://www.zohoapis.in/books/v3/contacts?organization_id=${envVariables.ORGANIZATION_ID}`,userObj,config).then(async result=>{
                         logger.info("Step 2 successfull - created a new customer on the fly"," correlationId Id: ",correlationId, " patient uhid: ",uhid);
+                        // Updating customer_id from zoho in patient table 
+                        // await db.Patient_Update(uhid, result.data.contact.contact_id, correlationId);
                         return result.data.contact.contact_id;
                     }).catch(err=>{
                         console.log(userObj);
@@ -180,7 +182,7 @@ zohoServices.invoice = async(uhid, items_list, userObj, msg_id, correlationId, e
 
             // Step 2 - Get user id from zoho Books or create a new user on the fly
             logger.trace("Step 2 started - Getting user id from zoho Books or else creating a new user on the fly")
-            let user_id = await zohoUserCreationOrUpdation(userObj,correlationId,uhid);
+            let user_id = await zohoUserCreationOrUpdation(userObj,correlationId,uhid,taskType="CREATE_ORDER");
 
             let invoice_create_body = {
                 "customer_id": user_id,
@@ -275,8 +277,9 @@ zohoServices.invoice = async(uhid, items_list, userObj, msg_id, correlationId, e
 
             if(success_msg){
                 let invoice_no = invoice_details.invoice.invoice_number;
-                let invoice_url = invoice_details.invoice.invoice_url;
-                return {msg_id, invoice_no, invoice_url, s3_bucket_url, correlationId};
+                let invoice_amount = invoice_details.invoice.total;
+                let invoice_url = invoice_details.invoice.invoice_url.replace("/secure","/securepay").trim();
+                return {msg_id, invoice_no, invoice_url, invoice_amount, s3_bucket_url, correlationId};
             }
         }).catch(error=>{
             if(error.response){
