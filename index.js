@@ -123,7 +123,7 @@ let token = await tokens.get_billing_access_token();
     const response = await axios.get('https://www.zohoapis.in/subscriptions/v1/products', {
       headers: {
          Authorization: `Zoho-oauthtoken ${token}`,
-        'X-com-zoho-subscriptions-organizationid' : `${envVariables.BILLING_ORGANIZATION_ID}`
+        'X-com-zoho-subscriptions-organizationid' : `${envVariables.ORGANIZATION_ID}`
       }
     });
         const planInfo = [];
@@ -165,7 +165,7 @@ const productId = req.params.productId;
     const response = await axios.get(`https://www.zohoapis.in/subscriptions/v1/plans?product_id=${productId}`, {
       headers: {
          Authorization: `Zoho-oauthtoken ${token}`,
-        'X-com-zoho-subscriptions-organizationid' : `${envVariables.BILLING_ORGANIZATION_ID}`
+        'X-com-zoho-subscriptions-organizationid' : `${envVariables.ORGANIZATION_ID}`
       }
     });
         const planInfo = [];
@@ -270,7 +270,7 @@ let token = await tokens.get_billing_access_token();
 
 const headers = {
   Authorization: `Zoho-oauthtoken ${token}`,
-  'X-com-zoho-subscriptions-organizationid' : `${envVariables.BILLING_ORGANIZATION_ID}`
+  'X-com-zoho-subscriptions-organizationid' : `${envVariables.ORGANIZATION_ID}`
  };
 
 const customerDetails = await axios.get(`https://www.zohoapis.in/subscriptions/v1/customers?cf_uhid=${patientDetails.clinical_uhid}`, {headers: headers})
@@ -484,7 +484,7 @@ app.post('/subscriptionPaymentHook', async(req, res) => {
   let token = await tokens.get_billing_access_token();
   const headers = {
     Authorization: `Zoho-oauthtoken ${token}`,
-    'X-com-zoho-subscriptions-organizationid' : `${envVariables.BILLING_ORGANIZATION_ID}`
+    'X-com-zoho-subscriptions-organizationid' : `${envVariables.ORGANIZATION_ID}`
   };
 
   const invoiceResponse = await axios.get(`https://www.zohoapis.in/subscriptions/v1/invoices/${invoice_id}`,{headers})
