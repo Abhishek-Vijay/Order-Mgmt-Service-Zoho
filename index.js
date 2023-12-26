@@ -113,7 +113,7 @@ app.get('/order-mgmt/patient/:uuid/order-invoice', async(req,res)=>{
 
 //API to list all the products
 app.get('/order-mgmt/subscriptions/products', async (req, res) => {
-let token = await tokens.get_billing_access_token();
+let token = await tokens.get_access_token();
  const correlationId = req.get('X-Correlation-ID');
  if(correlationId == null || correlationId.length == 0){
     logger.error('Correlation ID cannot be empty');
@@ -150,7 +150,7 @@ let token = await tokens.get_billing_access_token();
 
 //API to list all the plans of a product available
 app.get('/order-mgmt/subscriptions/product/:productId/plans', async (req, res) => {
-let token = await tokens.get_billing_access_token();
+let token = await tokens.get_access_token();
 const productId = req.params.productId;
  const correlationId = req.get('X-Correlation-ID');
  if(correlationId == null || correlationId.length == 0){
@@ -194,7 +194,7 @@ const productId = req.params.productId;
 
 //API to list specific plan for given plancode
 app.get('/order-mgmt/subscription/:planCode', async (req, res) => {
-let token = await tokens.get_billing_access_token();
+let token = await tokens.get_access_token();
 const planCode = req.params.planCode;
  const correlationId = req.get('X-Correlation-ID');
  if(correlationId == null || correlationId.length == 0){
@@ -245,7 +245,7 @@ const planCode = req.params.planCode;
 //API to retrieve the subscriptions of a patient
 app.get('/order-mgmt/patient/:patientId/subscription', async (req, res) => {
 const uuid = req.params.patientId;
-let token = await tokens.get_billing_access_token();
+let token = await tokens.get_access_token();
 
  const correlationId = req.get('X-Correlation-ID');
  if(correlationId == null || correlationId.length == 0){
@@ -320,7 +320,7 @@ try {
 
 //API to create a subscription for a patient
 app.post('/order-mgmt/patient/:patientId/subscription', async (req, res) => {
- let token = await tokens.get_billing_access_token();
+ let token = await tokens.get_access_token();
  const contentTypeHeader = req.get('Content-Type');
  const correlationId = req.get('X-Correlation-ID');
  let patientId = req.params.patientId;
@@ -481,7 +481,7 @@ app.post('/subscriptionPaymentHook', async(req, res) => {
     logger("plan name retreival Error", err)
   }); 
 
-  let token = await tokens.get_billing_access_token();
+  let token = await tokens.get_access_token();
   const headers = {
     Authorization: `Zoho-oauthtoken ${token}`,
     'X-com-zoho-subscriptions-organizationid' : `${envVariables.ORGANIZATION_ID}`
