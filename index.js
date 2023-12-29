@@ -481,7 +481,7 @@ app.post('/subscriptionPaymentHook', async(req, res) => {
     logger("plan name retreival Error", err)
   }); 
 
-  let token = await tokens.get_billing_access_token();
+  let token = await tokens.get_access_token();
   const headers = {
     Authorization: `Zoho-oauthtoken ${token}`,
     'X-com-zoho-subscriptions-organizationid' : `${envVariables.ORGANIZATION_ID}`
