@@ -36,7 +36,7 @@ const SubscriptionNotification = async(customerUHID,patientId,customerName,planN
             }
         }
     }
-    logger.info("Notification Body to be send in SQS",notificationBody);
+    logger.info("Notification Body to be send in SQS",JSON.stringify(notificationBody));
 
     // Notification queue
     const notificationInput = { // SendMessageRequestInput
@@ -83,7 +83,7 @@ const InvoiceNotification = async(customerUHID,patientId,customerName,planName="
             }
         }
     }
-    logger.info("Notification Body to be send in SQS",notificationBody);
+    logger.info("Notification Body to be send in SQS",JSON.stringify(notificationBody));
 
     // Notification queue
     const notificationInput = { // SendMessageRequestInput

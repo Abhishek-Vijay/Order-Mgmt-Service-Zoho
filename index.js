@@ -45,7 +45,7 @@ app.use(bodyParser.json());
 let queueFlag = true;
 // SQS Caller Function to get the queue 
 const readingSQSMsg = async() =>{
-    logger.info("Middleware called");
+    logger.debug("Middleware called");
     if(queueFlag){
         try {
             let command = new ReceiveMessageCommand(invoiceParams)
@@ -53,7 +53,7 @@ const readingSQSMsg = async() =>{
             if (data.Messages) {
                 processInvoiceMessage(data.Messages[0])
             } else {
-                logger.warn("No messages to delete in Invoice Queue");
+                logger.debug("No messages to delete in Invoice Queue");
             }
         } catch (err) {
             logger.error("Receive Error", err);
@@ -65,7 +65,7 @@ const readingSQSMsg = async() =>{
             if (data.Messages) {
                 processPersonMessage(data.Messages[0])
             } else {
-                logger.warn("No messages to delete in Person Queue");
+                logger.debug("No messages to delete in Person Queue");
             }
         } catch (err) {
             logger.error("Receive Error", err);
@@ -401,7 +401,7 @@ app.post('/paymentHook', async(req, res) => {
         let processing_status;
         let payment_date = null;
         let invoice_url =  req.body.invoice_url?.replace("/secure","/securepay").trim();
-        logger.info(req.body);
+        logger.info(JSON.stringify(req.body));
         if (req.body.status.toUpperCase() == 'PAID'){ 
           payment_date = new Date();
           invoice_url =  req.body.invoice_url;
@@ -421,7 +421,7 @@ app.post('/paymentHook', async(req, res) => {
 
 app.post('/subscriptionHook', async(req, res) => {
  logger.trace('Request received to update subscription details');
-  logger.info("Received information in request body",req.body);
+  logger.info("Received information in request body",JSON.stringify(req.body));
   try{
   let subscriptionId = req.body.subscriptionId;
   let customerId = req.body.customerId;
@@ -456,7 +456,7 @@ app.post('/subscriptionHook', async(req, res) => {
 
 app.post('/subscriptionPaymentHook', async(req, res) => {
   logger.trace('Request received to update subscription details');
-  logger.info("Received information in request body",req.body);
+  logger.info("Received information in request body",JSON.stringify(req.body));
   let invoice_id = req.body.invoice_id;
   let clinical_uhid = req.body.customer_UHID;
   let invoice_number = req.body.invoice_number;
