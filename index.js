@@ -14,6 +14,11 @@ const { SQSClient, ReceiveMessageCommand } = require("@aws-sdk/client-sqs");
 // Create SQS service object.
 const sqsClient = new SQSClient({region: envVariables.REGION});
 
+// S3 related imports
+const { S3Client, PutObjectCommand} = require("@aws-sdk/client-s3");
+// Create an Amazon S3 service client object.
+const s3Client = new S3Client({ region: envVariables.REGION });
+
 const invoiceParams = {
     AttributeNames: ["SentTimestamp"],
     MaxNumberOfMessages: 1,
@@ -397,30 +402,100 @@ app.post('/paymentHook', async(req, res) => {
         return res.sendStatus(401);
     }
     // print request body
-    if(req.body.status){
-        let processing_status;
-        let payment_date = null;
-        let invoice_url =  req.body.invoice_url?.replace("/secure","/securepay").trim();
-        logger.info(JSON.stringify(req.body));
-        if (req.body.status.toUpperCase() == 'PAID'){ 
-          payment_date = new Date();
-          invoice_url =  req.body.invoice_url;
-          processing_status = 'PAYMENT_COMPLETED';}
-        else if (req.body.status.toUpperCase() == 'FAILED') processing_status = 'PAYMENT_FAILED';
-        else if (req.body.status.toUpperCase() == 'OVERDUE') processing_status = 'PAYMENT_OVERDUE';
-        await db.Order_Update_Payment(req.body.invoice_number, processing_status, req.body.status.toUpperCase(), payment_date, invoice_url).then(data=>data).catch(err=>{
-            logger.error(err);
-            return;
-        });
-        await db.Order_Txn_Logs_Webhook_Update(req.body.invoice_number, processing_status);
+    // if(req.body.status){
+    //     let processing_status;
+    //     let payment_date = null;
+    //     let invoice_url =  req.body.invoice_url?.replace("/secure","/securepay").trim();
+    //     logger.info(JSON.stringify(req.body));
+    //     if (req.body.status.toUpperCase() == 'PAID'){ 
+    //       payment_date = new Date();
+    //       invoice_url =  req.body.invoice_url;
+    //       processing_status = 'PAYMENT_COMPLETED';}
+    //     else if (req.body.status.toUpperCase() == 'FAILED') processing_status = 'PAYMENT_FAILED';
+    //     else if (req.body.status.toUpperCase() == 'OVERDUE') processing_status = 'PAYMENT_OVERDUE';
+    //     await db.Order_Update_Payment(req.body.invoice_number, processing_status, req.body.status.toUpperCase(), payment_date, invoice_url).then(data=>data).catch(err=>{
+    //         logger.error(err);
+    //         return;
+    //     });
+    //     await db.Order_Txn_Logs_Webhook_Update(req.body.invoice_number, processing_status);
+    // }
+    // // return a text response
+    // const data = { type: 'Received' };
+    // res.json(data);
+
+  logger.debug('Request received to update Invoice details');
+  logger.info("Received information in request body",JSON.stringify(req.body));
+  let invoice_id = req.body.invoice_id;
+  let clinical_uhid = req.body.customer_UHID;
+  let invoice_number = req.body.invoice_number;
+  let invoice_url =  req.body.invoice_url?.replace("/secure","/securepay").trim();
+  let amount =  req.body.invoice_total;
+  let payment_status = req.body.status?.toUpperCase() === 'SENT' ? "DUE" : req.body.status?.toUpperCase() === 'PAID' ? "PAID" : "FAILED"
+  let customer_name =  req.body.customer_name;
+  let invoice_type = 'LAB_ORDER';
+
+  try{
+    // Step 6 - Get Invoice in pdf format and save it to amazon S3 bucket
+    let access_token = await tokens.accessToken(clinical_uhid); 
+    let config = {
+        headers:{
+            Authorization: `Zoho-oauthtoken ${access_token}`,
+            'content-type': 'application/json',
+            'responseType': 'arraybuffer'
+        },
+        retry: 3
     }
-    // return a text response
-    const data = { type: 'Received' };
+    // let new_config = config;
+    // new_config['responseType'] = 'arraybuffer'
+    let invoice_in_pdf = await axios.get(`https://www.zohoapis.in/books/v3/invoices/${invoice_id}?organization_id=${envVariables.ORGANIZATION_ID}&accept=pdf`,config)
+    .then(res=>{
+        // logger.info(res.data," patient uhid: ",clinical_uhid)
+        return res.data;
+    }).catch(err=>{
+        logger.error("Getting invoice in pdf format error, " + err.response.data.message +" patient uhid: ",clinical_uhid)
+        // throw new Error("Getting invoice in pdf format error, " + err.response.data.message);
+    })
+
+    // TODO : need to get encounterId from UC_ORDER table.
+    let encounterId = await db.get_encounter_id(invoice_number);
+    // Set the parameters for S3 Bucket
+    const params = {
+        Bucket: `${envVariables.S3_BUCKET}`, // The name of the bucket. For example, 'sample-bucket-101'.
+        Key: `${envVariables.DEPLOYMENT_ENV}/${envVariables.S3_FOLDER}/${clinical_uhid}/${encounterId}/${invoice_number}.pdf`, // The name of the object. For example, 'sample_upload.txt'.
+        Body: invoice_in_pdf, // The content of the object. For example, 'Hello world!".
+    };
+
+    let s3_bucket_url;
+    try {
+        const results = await s3Client.send(new PutObjectCommand(params));
+        logger.info("Successfully created " + params.Key + " and uploaded it to " + params.Bucket + "/" + params.Key);
+        // return results; // For unit tests.
+        s3_bucket_url = `https://${envVariables.S3_BUCKET}.s3.${envVariables.REGION}.amazonaws.com/${envVariables.DEPLOYMENT_ENV}/${envVariables.S3_FOLDER}/${clinical_uhid}/${encounterId}/${invoice_number}.pdf`
+      } catch (err) {
+        logger.error("Error while uploading invoice pdf in S3 Bucket: ", err);
+    }
+  //  Inserting or Updating invoice record in UC_INVOICE
+  invoice_url = payment_status === 'PAID' ? req.body.invoice_url : invoice_url;
+  if(clinical_uhid == "") throw new Error("Clinical_UHID should not be empty, Hence not processing this request.");
+  await db.insert_update_invoice(invoice_id, clinical_uhid, invoice_number, invoice_url, amount, payment_status, invoice_type, s3_bucket_url); 
+  let processing_status;
+  if (payment_status == 'PAID') processing_status = 'PAYMENT_COMPLETED';
+  else if (payment_status == 'FAILED') processing_status = 'PAYMENT_FAILED';
+  else if (payment_status == 'DUE') processing_status = 'PAYMENT_OVERDUE';
+  await db.Order_Txn_Logs_Webhook_Update(invoice_number, processing_status);
+  
+  let patientId = await db.get_patient_uuid(clinical_uhid);
+  InvoiceNotification(clinical_uhid,patientId,customer_name,invoice_type,payment_status,amount);
+
+    const data = { type: 'Lab order successfull' };
     res.json(data);
+  }catch (err){
+    logger.error("paymentHook Error", err);
+  }
 });
 
 app.post('/subscriptionHook', async(req, res) => {
- logger.trace('Request received to update subscription details');
+ logger.debug('Request received to update subscription details');
   logger.info("Received information in request body",JSON.stringify(req.body));
   try{
   let subscriptionId = req.body.subscriptionId;
@@ -455,7 +530,7 @@ app.post('/subscriptionHook', async(req, res) => {
 });
 
 app.post('/subscriptionPaymentHook', async(req, res) => {
-  logger.trace('Request received to update subscription details');
+  logger.debug('Request received to update subscription details');
   logger.info("Received information in request body",JSON.stringify(req.body));
   let invoice_id = req.body.invoice_id;
   let clinical_uhid = req.body.customer_UHID;
@@ -465,13 +540,51 @@ app.post('/subscriptionPaymentHook', async(req, res) => {
   let payment_status = req.body.invoice_status?.toUpperCase() === 'SENT' ? "DUE" : req.body.invoice_status?.toUpperCase() === 'PAID' ? "PAID" : "FAILED"
   let product_id = req.body.product_id;
   let customer_name =  req.body.customer_name;
+  let invoice_type = 'SUBSCRIPTION';
 
   try{
+  // Step 6 - Get Invoice in pdf format and save it to amazon S3 bucket
+  let access_token = await tokens.accessToken(clinical_uhid); 
+  let config = {
+      headers:{
+          Authorization: `Zoho-oauthtoken ${access_token}`,
+          'content-type': 'application/json',
+          'responseType': 'arraybuffer'
+      },
+      retry: 3
+  }
+  // let new_config = config;
+  // new_config['responseType'] = 'arraybuffer'
+  let invoice_in_pdf = await axios.get(`https://www.zohoapis.in/books/v3/invoices/${invoice_id}?organization_id=${envVariables.ORGANIZATION_ID}&accept=pdf`,config)
+  .then(res=>{
+      // logger.info(res.data," patient uhid: ",clinical_uhid)
+      return res.data;
+  }).catch(err=>{
+      logger.error("Getting invoice in pdf format error, " + err.response.data.message +" patient uhid: ",clinical_uhid)
+      // throw new Error("Getting invoice in pdf format error, " + err.response.data.message);
+  })
+
+  // Set the parameters for S3 Bucket
+  const params = {
+      Bucket: `${envVariables.S3_BUCKET}`, // The name of the bucket. For example, 'sample-bucket-101'.
+      Key: `${envVariables.DEPLOYMENT_ENV}/${envVariables.S3_FOLDER}/${clinical_uhid}/Subscriptions/${invoice_number}.pdf`, // The name of the object. For example, 'sample_upload.txt'.
+      Body: invoice_in_pdf, // The content of the object. For example, 'Hello world!".
+  };
+
+  let s3_bucket_url;
+  try {
+      const results = await s3Client.send(new PutObjectCommand(params));
+      logger.info("Successfully created " + params.Key + " and uploaded it to " + params.Bucket + "/" + params.Key);
+      // return results; // For unit tests.
+      s3_bucket_url = `https://${envVariables.S3_BUCKET}.s3.${envVariables.REGION}.amazonaws.com/${envVariables.DEPLOYMENT_ENV}/${envVariables.S3_FOLDER}/${clinical_uhid}/Subscriptions/${invoice_number}.pdf`
+    } catch (err) {
+      logger.error("Error while uploading invoice pdf in S3 Bucket: ", err);
+    }
+    
   //  Inserting or Updating invoice record in UC_INVOICE
   invoice_url = payment_status === 'PAID' ? req.body.invoice_url : invoice_url;
   if(clinical_uhid == "") throw new Error("Clinical_UHID should not be empty, Hence not processing this request.");
-  await db.get_patient_uuid(clinical_uhid);
-  await db.insert_update_invoice(invoice_id, clinical_uhid, invoice_number, invoice_url, amount, payment_status);
+  await db.insert_update_invoice(invoice_id, clinical_uhid, invoice_number, invoice_url, amount, payment_status, invoice_type, s3_bucket_url);
 
   let patientId = await db.get_patient_uuid(clinical_uhid);
   //  getting product_name from Database
@@ -481,9 +594,9 @@ app.post('/subscriptionPaymentHook', async(req, res) => {
     logger("plan name retreival Error", err)
   }); 
 
-  let token = await tokens.get_billing_access_token();
+  // let token = await tokens.get_billing_access_token();
   const headers = {
-    Authorization: `Zoho-oauthtoken ${token}`,
+    Authorization: `Zoho-oauthtoken ${access_token}`,
     'X-com-zoho-subscriptions-organizationid' : `${envVariables.ORGANIZATION_ID}`
   };
 
@@ -493,7 +606,7 @@ app.post('/subscriptionPaymentHook', async(req, res) => {
   // console.log(responseData.invoice.invoice_items[0].description.split('(')[1].split(')')[0]);
 
   if(payment_status === "PAID") SubscriptionNotification(clinical_uhid,patientId,customer_name,planName,productName);
-  else if(payment_status === "DUE") InvoiceNotification(clinical_uhid,patientId,customer_name,planName,productName);
+  else if(payment_status === "DUE") InvoiceNotification(clinical_uhid,patientId,customer_name,invoice_type,payment_status,"",planName,productName);
 
     const data = { type: 'Subscribed successfully' };
     res.json(data);

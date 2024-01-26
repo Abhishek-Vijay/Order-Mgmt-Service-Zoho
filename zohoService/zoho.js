@@ -2,12 +2,10 @@ const envVariables = require('../helper/envHelper');
 const axios = require('axios');
 const tokens = require('./access_token_Module');
 
-// S3 related imports
-const { S3Client, PutObjectCommand} = require("@aws-sdk/client-s3");
-// Create an Amazon S3 service client object.
-const s3Client = new S3Client({ region: envVariables.REGION });
-
-let token;
+// // S3 related imports
+// const { S3Client, PutObjectCommand} = require("@aws-sdk/client-s3");
+// // Create an Amazon S3 service client object.
+// const s3Client = new S3Client({ region: envVariables.REGION });
 
 var log4js = require('log4js');
 const db = require('../db/DBModule');
@@ -44,38 +42,16 @@ axios.interceptors.response.use( undefined, async(err) => {
     return axios(config);
   });
 
-const accessToken = async(correlationId,uhid) =>{
-    // Step 1 - get auth code using client_id and client_secret
-        // Step 1 - To get access token using auth code
-        if(token){
-            // let token_time = await file.token_time_read().then(data => +data).catch(error => {
-            //     logger.error(error);
-            //     return;
-            // });
-            if(token_timer && ((Date.now()) - token_timer < (token.expires_in-300)*1000)){
-                logger.info("token without any API call ",token.access_token," correlationId Id: ",correlationId, " patient uhid: ",uhid);
-            }else{
-                token = await tokens.get_access_token();
-                logger.info("token after API call because expired ",token.access_token," correlationId Id: ",correlationId, " patient uhid: ",uhid);
-            }
-        }else{
-            token = await tokens.get_access_token();
-            logger.info("token after API call ",token.access_token," correlationId Id: ",correlationId, " patient uhid: ",uhid);
-        }
-
-        let config = {
-            headers:{
-                Authorization: `Zoho-oauthtoken ${token.access_token}`,
-                'content-type': 'application/json'
-            },
-            retry: 3
-        }
-        return config;
-}
-
 // to create or update an user in zoho books
 const zohoUserCreationOrUpdation = async(userObj, correlationId, uhid, taskType) =>{
-    let config = await accessToken(correlationId,uhid);
+    let access_token = await tokens.accessToken(uhid); 
+    let config = {
+        headers:{
+            Authorization: `Zoho-oauthtoken ${access_token}`,
+            'content-type': 'application/json'
+        },
+        retry: 3
+    }
     console.log(config);
     return axios.get(`https://www.zohoapis.in/books/v3/contacts?cf_uhid=${uhid}&organization_id=${envVariables.ORGANIZATION_ID}`,config)
             .then(res=>{
@@ -127,9 +103,16 @@ const zohoUserCreationOrUpdation = async(userObj, correlationId, uhid, taskType)
             })
 }
 
-zohoServices.invoice = async(uhid, items_list, userObj, msg_id, correlationId, encounterId) =>{
+zohoServices.invoice = async(uhid, items_list, userObj, msg_id, correlationId) =>{
     try {
-        let config = await accessToken(correlationId, uhid); 
+        let access_token = await tokens.accessToken(uhid); 
+        let config = {
+            headers:{
+                Authorization: `Zoho-oauthtoken ${access_token}`,
+                'content-type': 'application/json'
+            },
+            retry: 3
+        }
         // let testing = await axios.get('http://localhost:7000/testingAPI', config).then(res=>{
         //     console.log("promise resolved");
         //     console.log(res);
@@ -246,40 +229,40 @@ zohoServices.invoice = async(uhid, items_list, userObj, msg_id, correlationId, e
             txn_logs = [];
             log_index = 1;
 
-            // Step 6 - Get Invoice in pdf format and save it to amazon S3 bucket
-            let new_config = config;
-            new_config['responseType'] = 'arraybuffer'
-            let invoice_in_pdf = await axios.get(`https://www.zohoapis.in/books/v3/invoices/${invoice_details.invoice.invoice_id}?organization_id=${envVariables.ORGANIZATION_ID}&accept=pdf`,new_config)
-            .then(res=>{
-                logger.info(res.data," correlationId Id: ",correlationId, " patient uhid: ",uhid)
-                return res.data
-            }).catch(err=>{
-                logger.error("Getting invoice in pdf format error, " + err.response.data.message +" on message id =>"+msg_id," correlationId Id: ",correlationId, " patient uhid: ",uhid)
-                // throw new Error("Getting invoice in pdf format error, " + err.response.data.message);
-            })
+            // // Step 6 - Get Invoice in pdf format and save it to amazon S3 bucket
+            // let new_config = config;
+            // new_config['responseType'] = 'arraybuffer'
+            // let invoice_in_pdf = await axios.get(`https://www.zohoapis.in/books/v3/invoices/${invoice_details.invoice.invoice_id}?organization_id=${envVariables.ORGANIZATION_ID}&accept=pdf`,new_config)
+            // .then(res=>{
+            //     logger.info(res.data," correlationId Id: ",correlationId, " patient uhid: ",uhid)
+            //     return res.data
+            // }).catch(err=>{
+            //     logger.error("Getting invoice in pdf format error, " + err.response.data.message +" on message id =>"+msg_id," correlationId Id: ",correlationId, " patient uhid: ",uhid)
+            //     // throw new Error("Getting invoice in pdf format error, " + err.response.data.message);
+            // })
 
-            // Set the parameters for S3 Bucket
-            const params = {
-                Bucket: `${envVariables.S3_BUCKET}`, // The name of the bucket. For example, 'sample-bucket-101'.
-                Key: `${envVariables.DEPLOYMENT_ENV}/${envVariables.S3_FOLDER}/${uhid}/${encounterId}/${invoice_details.invoice.invoice_number}.pdf`, // The name of the object. For example, 'sample_upload.txt'.
-                Body: invoice_in_pdf, // The content of the object. For example, 'Hello world!".
-            };
+            // // Set the parameters for S3 Bucket
+            // const params = {
+            //     Bucket: `${envVariables.S3_BUCKET}`, // The name of the bucket. For example, 'sample-bucket-101'.
+            //     Key: `${envVariables.DEPLOYMENT_ENV}/${envVariables.S3_FOLDER}/${uhid}/${encounterId}/${invoice_details.invoice.invoice_number}.pdf`, // The name of the object. For example, 'sample_upload.txt'.
+            //     Body: invoice_in_pdf, // The content of the object. For example, 'Hello world!".
+            // };
 
-            let s3_bucket_url;
-            try {
-                const results = await s3Client.send(new PutObjectCommand(params));
-                logger.info("Successfully created " + params.Key + " and uploaded it to " + params.Bucket + "/" + params.Key);
-                // return results; // For unit tests.
-                s3_bucket_url = `https://${envVariables.S3_BUCKET}.s3.${envVariables.REGION}.amazonaws.com/${envVariables.DEPLOYMENT_ENV}/${envVariables.S3_FOLDER}/${uhid}/${encounterId}/${invoice_details.invoice.invoice_number}.pdf`
-              } catch (err) {
-                logger.error("Error while uploading invoice pdf in S3 Bucket: ", err);
-            }
+            // let s3_bucket_url;
+            // try {
+            //     const results = await s3Client.send(new PutObjectCommand(params));
+            //     logger.info("Successfully created " + params.Key + " and uploaded it to " + params.Bucket + "/" + params.Key);
+            //     // return results; // For unit tests.
+            //     s3_bucket_url = `https://${envVariables.S3_BUCKET}.s3.${envVariables.REGION}.amazonaws.com/${envVariables.DEPLOYMENT_ENV}/${envVariables.S3_FOLDER}/${uhid}/${encounterId}/${invoice_details.invoice.invoice_number}.pdf`
+            //   } catch (err) {
+            //     logger.error("Error while uploading invoice pdf in S3 Bucket: ", err);
+            // }
 
             if(success_msg){
                 let invoice_no = invoice_details.invoice.invoice_number;
-                let invoice_amount = invoice_details.invoice.total;
-                let invoice_url = invoice_details.invoice.invoice_url.replace("/secure","/securepay").trim();
-                return {msg_id, invoice_no, invoice_url, invoice_amount, s3_bucket_url, correlationId};
+                // let invoice_amount = invoice_details.invoice.total;
+                // let invoice_url = invoice_details.invoice.invoice_url.replace("/secure","/securepay").trim();
+                return {msg_id, invoice_no, correlationId};
             }
         }).catch(error=>{
             if(error.response){
