@@ -1,0 +1,17 @@
+{
+    "key": {
+        "clinicalUhid": "1472D",
+        "messageId": "2ab3dc9d-780e-4693-9be0-c3c6revch25fweb",
+        "patientId": "b680c69c-4bdc-4f30-bd20-ev06efgwng4gsdedbc",
+        "correlationId": "7ab22047-1a3d-11re-9a61-0dsjbe47efbb"
+    },
+    "message": {
+        "taskType": "UPDATE_PERSON",  // "CREATE_PERSON"
+        "personInfo": {
+            "lastName": "Baba",
+            "firstName": "Steve",
+            "middleName": null,
+            "emailId": "<Your-Email-Here>"
+        }
+    }
+}
