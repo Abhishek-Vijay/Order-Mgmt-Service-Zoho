@@ -205,7 +205,7 @@ zohoServices.invoice = async(uhid, items_list, userObj, msg_id, correlationId) =
                 "to_mail_ids": [
                     userObj.contact_persons[0].email
                 ],
-                "subject": `Invoice from Tata MD Healthcare (Invoice#: ${invoice_details.invoice.invoice_number})`,
+                "subject": `Invoice from Healthcare System (Invoice#: ${invoice_details.invoice.invoice_number})`,
                 "body": `Dear Customer,         <br><br>Thanks for your business.         <br><br>The invoice ${invoice_details.invoice.invoice_number} is attached with this email. You can choose the easy way out and <a href= ${invoice_details.invoice.invoice_url.replace("/secure","/securepay")}  >pay online for this invoice.</a>         <br><br>Here's an overview of the invoice for your reference.         <br><br>Invoice Overview:         <br>Invoice  : ${invoice_details.invoice.invoice_number}         <br>Date : ${invoice_details.invoice.date}         <br>Amount : ${invoice_details.invoice.currency_symbol} ${invoice_details.invoice.total}         <br><br>Thank you for giving us this opportunity to serve you. In case of any queries, please reach out to us at 08069156999.<br><br>\nRegards<br>\n Health Companion<br>\n`
             }
 
