@@ -28,7 +28,7 @@ const SubscriptionNotification = async(customerUHID,patientId,customerName,planN
                 title: "Care subscription enrollment status",
                 body: `Dear ${customerName}, You have successfully subscribed with ${productName} - ${planName}`,
                 type: "CARE_SUBSCRIPTION",
-                status : "CREATED",
+                status : "COMPLETED",
                 additionalInfo:{
                     isUcMember:"true",
                     planName: planName
@@ -62,10 +62,36 @@ const SubscriptionNotification = async(customerUHID,patientId,customerName,planN
     }
 }
 
-const InvoiceNotification = async(customerUHID,patientId,customerName,planName="",productName="") =>{
+const InvoiceNotification = async(customerUHID,patientId,customerName,invoice_type,payment_status,amount="",planName="",productName="") =>{
     let messageId = UUIDGenerator();
     let correlationId = UUIDGenerator();
+    let content;
     logger.info("new correlationId is:",correlationId)
+
+    if(invoice_type == "LAB_ORDER"){
+        if(payment_status=="DUE"){
+            content = {
+                title: `Invoice successfully generated for the lab order`,
+                body: `Dear ${customerName}, We are looking forward to providing the best care for you. Kindly click here to complete the payment of ${amount}`,
+                type: "CARE_INVOICE",
+                status: payment_status
+            }
+        }else if(payment_status=="PAID"){
+            content = {
+                title: `Invoice payment successful for the lab order`,
+                body: `Dear ${customerName}, Thank you for trusting us to better your health. This is a confirmation for receipt of INR ${amount} towards the UHID ${customerUHID}`,
+                type: "CARE_INVOICE",
+                status: payment_status
+            }
+        }     
+    }else{
+        content = {
+            title: `Invoice successfully generated for the subscription`,
+            body: `Dear ${customerName}, Invoice successfully generated for your plan ${productName} - ${planName}`,
+            type: "CARE_INVOICE",
+            status: payment_status
+        }
+    }
 
     const notificationBody = {
         key: {
@@ -76,11 +102,7 @@ const InvoiceNotification = async(customerUHID,patientId,customerName,planName="
         },
         message: {
             type: "MOBILE_PUSH",
-            content: {
-                title: `Invoice successfully generated for the subscription`,
-                body: `Dear ${customerName}, Invoice successfully generated for your plan ${productName} - ${planName}`,
-                type: "CARE_INVOICE"
-            }
+            content: content
         }
     }
     logger.info("Notification Body to be send in SQS",JSON.stringify(notificationBody));
