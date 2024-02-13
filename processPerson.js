@@ -32,6 +32,7 @@ const processPersonMessage = async(message) =>{
                             "first_name": `${person_from_msg.firstName}`,
                             "last_name": `${person_from_msg.lastName}`,
                             "email": `${person_from_msg.emailId.trim()}`,
+                            "mobile": `${person_from_msg.phoneNumber.trim()}`,
                             "is_primary_contact": true,
                             "enable_portal": true
                         }
