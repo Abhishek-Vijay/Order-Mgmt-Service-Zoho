@@ -105,7 +105,7 @@ const get_billing_access_token = async() =>{
             throw new Error("access token error, " + error.response.data.message);
         })
         // current time in milliseconds from 1st jan 1970
-        // token_timer = Date.now();
+        token_timer = Date.now();
         return token;
     }
     }
