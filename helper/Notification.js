@@ -28,6 +28,7 @@ const SubscriptionNotification = async(customerUHID,patientId,customerName,planN
                 title: "Care subscription enrollment status",
                 body: `Dear ${customerName}, You have successfully subscribed with ${productName} - ${planName}`,
                 type: "CARE_SUBSCRIPTION",
+                typeName: "Care Subscription",
                 status : "COMPLETED",
                 additionalInfo:{
                     isUcMember:"true",
@@ -74,6 +75,7 @@ const InvoiceNotification = async(customerUHID,patientId,customerName,invoice_ty
                 title: `Invoice successfully generated for the lab order`,
                 body: `Dear ${customerName}, We are looking forward to providing the best care for you. Kindly click here to complete the payment of ${amount}`,
                 type: "CARE_INVOICE",
+                typeName: "Care Invoice",
                 status: payment_status
             }
         }else if(payment_status=="PAID"){
@@ -81,6 +83,7 @@ const InvoiceNotification = async(customerUHID,patientId,customerName,invoice_ty
                 title: `Invoice payment successful for the lab order`,
                 body: `Dear ${customerName}, Thank you for trusting us to better your health. This is a confirmation for receipt of INR ${amount} towards the UHID ${customerUHID}`,
                 type: "CARE_INVOICE",
+                typeName: "Care Invoice",
                 status: payment_status
             }
         }     
@@ -89,6 +92,7 @@ const InvoiceNotification = async(customerUHID,patientId,customerName,invoice_ty
             title: `Invoice successfully generated for the subscription`,
             body: `Dear ${customerName}, Invoice successfully generated for your plan ${productName} - ${planName}`,
             type: "CARE_INVOICE",
+            typeName: "Care Invoice",
             status: payment_status
         }
     }

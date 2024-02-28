@@ -396,6 +396,8 @@ if(subscription_logs.subscription_status == 'SUBSCRIBED' && subscription_logs.pa
 });
 
 // Payment webhook for payment notification.
+/* The above code is a route handler function in a Node.js application that listens for POST requests
+to '/paymentHook'. Here is a summary of what the code is doing: */
 app.post('/paymentHook', async(req, res) => {
     // check if verification token is correct
     if (req.headers.token !== envVariables.TOKEN) {
@@ -529,6 +531,9 @@ app.post('/subscriptionHook', async(req, res) => {
     }
 });
 
+/* The above code is a route handler in a Node.js application that listens for POST requests to
+'/subscriptionPaymentHook'. When a request is received, it processes the information in the request
+body related to a subscription payment. Here is a breakdown of the main tasks performed by the code: */
 app.post('/subscriptionPaymentHook', async(req, res) => {
   logger.debug('Request received to update subscription details');
   logger.info("Received information in request body",JSON.stringify(req.body));
