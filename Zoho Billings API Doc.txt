@@ -1,0 +1,161 @@
+https://www.zoho.com/billing/api/v1
+
+Note - use https://accounts.zoho.in/ for all the APIs to access indian Data centers.
+
+1. OAuth - 
+https://www.zoho.com/billing/api/v1/oauth/#overview
+
+Step 1: Register a New Client
+
+Step 2: Generating Grant Token :
+get request in browser
+https://accounts.zoho.in/oauth/v2/auth?
+scope=ZohoSubscriptions.fullaccess.all&
+client_id=<Client ID obtained while registering the client>&
+state=testing&
+response_type=code&
+redirect_uri=<One of the redirect URI given in above step. This parameter should be same redirect url mentioned while registering the Client>&
+access_type=offline&
+prompt=noconsent
+
+Step 3: Generate Access And Refresh Token :
+curl https://accounts.zoho.in/oauth/v2/token \
+-X POST \
+-d 'code=<code which is obtained in the above step>' \
+-d 'client_id=1000.0SRSxxxxxxxxxxxxxxxxxxxx239V' \
+-d 'client_secret=fb01xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx8abf' \
+-d 'redirect_uri=http://www.zoho.com/subscriptions' \
+-d 'grant_type=authorization_code' \
+
+In the response, you will get both access_token and refresh_token.
+1. The access_token will expire after a particular period (as given in expires_in param in the response).
+2. The refresh_token is permanent and will be used to regenerate new access_token, if the current access token is expired.
+
+Step 4: Generate Access Token From Refresh Token
+
+Step 5: Calling An API
+Access Token can be passed only in header and cannot be passed in the request param.
+Header name should be Authorization
+Header value should be Zoho-oauthtoken {access_token}
+
+
+2. List all the Plans - 
+https://www.zoho.com/billing/api/v1/plans/#list-all-plans
+
+const options = {
+  method: 'GET',
+  headers: {
+    'X-com-zoho-subscriptions-organizationid': '10234695',
+    Authorization: 'Zoho-oauthtoken 1000.41d9xxxxxxxxxxxxxxxxxxxxxxxxc2d1.8fccxxxxxxxxxxxxxxxxxxxxxxxx125f'
+  }
+};
+
+fetch('https://www.zohoapis.in/subscriptions/v1/plans', options)
+  .then(response => response.json())
+  .then(response => console.log(response))
+  .catch(err => console.error(err));
+
+
+3. Create a customer / List All Customers (filter a customer by uhid or custom field) -
+https://www.zoho.com/billing/api/v1/customers/#create-a-customer
+
+List all customers API
+
+const options = {
+  method: 'GET',
+  headers: {
+    'X-com-zoho-subscriptions-organizationid': '10234695',
+    Authorization: 'Zoho-oauthtoken 1000.41d9xxxxxxxxxxxxxxxxxxxxxxxxc2d1.8fccxxxxxxxxxxxxxxxxxxxxxxxx125f'
+  }
+};
+
+fetch('https://www.zohoapis.in/subscriptions/v1/customers', options)
+  .then(response => response.json())
+  .then(response => console.log(response))
+  .catch(err => console.error(err));
+
+
+create a customer API 
+
+const options = {
+  method: 'POST',
+  headers: {
+    'X-com-zoho-subscriptions-organizationid': '10234695',
+    Authorization: 'Zoho-oauthtoken 1000.41d9xxxxxxxxxxxxxxxxxxxxxxxxc2d1.8fccxxxxxxxxxxxxxxxxxxxxxxxx125f',
+    'content-type': 'application/json'
+  },
+  body: '{"field1":"value1","field2":"value2"}'
+};
+
+fetch('https://www.zohoapis.in/subscriptions/v1/customers', options)
+  .then(response => response.json())
+  .then(response => console.log(response))
+  .catch(err => console.error(err));
+
+
+4. Hosted Pages, Create a subscription -
+https://www.zoho.com/billing/api/v1/hosted-pages/#create-a-subscription
+
+const options = {
+  method: 'POST',
+  headers: {
+    'X-com-zoho-billing-organizationid': '10234695',
+    Authorization: 'Zoho-oauthtoken 1000.41d9xxxxxxxxxxxxxxxxxxxxxxxxc2d1.8fccxxxxxxxxxxxxxxxxxxxxxxxx125f',
+    'content-type': 'application/json'
+  },
+  body: '{"field1":"value1","field2":"value2"}'
+};
+
+fetch('https://billing.zoho.com/api/v1/hostedpages/newsubscription', options)
+  .then(response => response.json())
+  .then(response => console.log(response))
+  .catch(err => console.error(err));
+
+5. List all subscription for a customer -
+https://www.zoho.com/billing/api/v1/subscription/#list-all-subscriptions
+
+To list the subscriptions of a particular customer append a param customer_id={customer_id}.
+
+const options = {
+  method: 'GET',
+  headers: {
+    'X-com-zoho-subscriptions-organizationid': '10234695',
+    Authorization: 'Zoho-oauthtoken 1000.41d9xxxxxxxxxxxxxxxxxxxxxxxxc2d1.8fccxxxxxxxxxxxxxxxxxxxxxxxx125f'
+  }
+};
+
+fetch('https://www.zohoapis.com/subscriptions/v1/subscriptions', options)
+  .then(response => response.json())
+  .then(response => console.log(response))
+  .catch(err => console.error(err));
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Books Refresh Token
+
+
+    // changed the scope to "ZohoBooks.invoices.CREATE ZohoBooks.invoices.READ ZohoBooks.invoices.UPDATE ZohoBooks.invoices.DELETE ZohoBooks.contacts.CREATE ZohoBooks.contacts.UPDATE ZohoBooks.contacts.READ ZohoBooks.contacts.DELETE ZohoBooks.settings.READ"
+    REFRESH_TOKEN: get(env, 'REFRESH_TOKEN') || '1000.98f9f22ad4d3618285508c11bf54819e.9936247b0411734224b36f6155313550',
+ 
