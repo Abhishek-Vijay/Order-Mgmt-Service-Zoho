@@ -179,7 +179,16 @@ zohoServices.invoice = async(uhid, items_list, userObj, msg_id, correlationId) =
                             "gateway_name": envVariables.PAYMENT_GATEWAY
                         }
                     ]
-                }
+                },
+                "custom_fields": [
+                    {
+                        "label": "UHID",
+                        "api_name": "cf_uhid",
+                        "customfield_id": "685927000003286535",
+                        "placeholder": "cf_uhid",
+                        "value": uhid
+                    }
+                ]
             }
 
             // Step 4 - create invoice and get invoice id to use in send email api
